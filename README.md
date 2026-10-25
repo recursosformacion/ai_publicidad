@@ -200,14 +200,17 @@ Se usarán claves foráneas, índices para las búsquedas de selección y fechas
 
 ## 9. Base de datos y configuración
 
-- **Producción:** MySQL, usando la configuración de entorno del despliegue OSAP.
-- **Desarrollo y pruebas:** SQLite para poder ejecutar pruebas sin depender de una instancia MySQL.
+- **Nombre de la base de datos de producción:** `OSAP_PUBLICIDAD`.
+- **Producción:** MySQL/MariaDB. El script `infrastructure/db/create_database.sql` crea únicamente la base vacía `OSAP_PUBLICIDAD` con codificación `utf8mb4`; debe ejecutarlo una persona autorizada en el servidor destino. No se ejecuta automáticamente ni crea usuarios o contraseñas.
+- **Desarrollo y pruebas:** SQLite por defecto, para no depender de una instancia MySQL.
+- Ejemplo de URL de conexión de producción (sustituir los valores de ejemplo por los secretos del despliegue, sin guardarlos en Git): `mysql+pymysql://USUARIO:CONTRASEÑA@SERVIDOR:3306/OSAP_PUBLICIDAD?charset=utf8mb4`. Configurarla en `AI_PUBLICIDAD_DATABASE_URL`.
+- Después de crear la base y configurar las variables de entorno, inicializar el esquema con `alembic upgrade head`. En producción no se crean tablas al arrancar la API: el esquema se gestiona mediante migraciones revisadas.
 - Las migraciones y consultas deben mantener compatibilidad entre ambos motores; no introducir dependencias exclusivas de MySQL sin aislarlas y probarlas.
-- No copiar contraseñas ni credenciales de otras aplicaciones a este repositorio, al README, a fixtures o a pruebas. Reutilizar el mecanismo seguro de configuración ya establecido en OSAP y conceder al servicio solo los permisos que necesite.
-- Variables de entorno orientativas: `DATABASE_URL` o configuración separada de host, puerto, nombre de base, usuario y contraseña; `APP_ENV`; `PUBLIC_BASE_URL`; configuración de claves de las aplicaciones.
+- No copiar contraseñas ni credenciales de otras aplicaciones a este repositorio, al README, a fixtures o a pruebas. Conceder al usuario de conexión solo los permisos que necesite.
+- Variables de entorno: `AI_PUBLICIDAD_DATABASE_URL`, `AI_PUBLICIDAD_ENV`, `AI_PUBLICIDAD_PUBLIC_BASE_URL` y `AI_PUBLICIDAD_SERVICE_TOKEN`, descritas en `.env.example`.
 - Los secretos locales deben quedar fuera de Git y los ejemplos de configuración usar valores ficticios.
 
-La decisión de stack ya está tomada: Python + FastAPI, coherente con los servicios OSAP actuales. La configuración seguirá el patrón del ecosistema: variables de entorno `AI_PUBLICIDAD_*` con precedencia sobre `osap.toml` local ignorado por Git, si se adopta el cargador TOML común. En producción, el arranque fallará si faltan parámetros obligatorios o se intenta usar configuración de prueba.
+La decisión de stack ya está tomada: Python + FastAPI, coherente con los servicios OSAP actuales. La configuración sigue el patrón de variables de entorno `AI_PUBLICIDAD_*`. En producción, el arranque fallará si faltan parámetros obligatorios o se intenta usar configuración de prueba.
 
 ## 10. Seguridad, privacidad y fiabilidad
 
