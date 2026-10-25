@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     )
     public_base_url: str = "http://127.0.0.1:8305"
     service_token: str = ""
+    admin_token: str = ""
     service_name: str = "ai_publicidad"
 
     @model_validator(mode="after")
@@ -115,6 +116,8 @@ class Settings(BaseSettings):
         if self.env == "production":
             if not self.service_token.strip():
                 raise ValueError("AI_PUBLICIDAD_SERVICE_TOKEN es obligatorio en producción")
+            if not self.admin_token.strip():
+                raise ValueError("AI_PUBLICIDAD_ADMIN_TOKEN es obligatorio en producción")
             if self.database_url.startswith("sqlite"):
                 raise ValueError("La base de datos de producción debe ser MySQL/MariaDB")
             try:
