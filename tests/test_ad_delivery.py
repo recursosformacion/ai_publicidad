@@ -41,6 +41,8 @@ def test_serve_ad_returns_commercial_and_impression_can_be_confirmed_once() -> N
     first = client.post("/api/v1/events/impression", json={"impression_id": payload["impression_id"]})
     second = client.post("/api/v1/events/impression", json={"impression_id": payload["impression_id"]})
     assert first.status_code == second.status_code == 200
+    assert first.json()["counted"] is True
+    assert second.json()["counted"] is False
     with Session(engine) as db:
         delivery = db.query(AdDelivery).one()
         assert delivery.impression_confirmed is True
