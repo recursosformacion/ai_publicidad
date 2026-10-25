@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from api.main import app
-from domain.models import AdDelivery, Base, Campaign, Creative
+from domain.models import AdDelivery, AdEvent, Base, Campaign, Creative
 from infrastructure.database import engine
 
 client = TestClient(app)
@@ -44,7 +44,7 @@ def test_serve_ad_returns_commercial_and_impression_can_be_confirmed_once() -> N
     with Session(engine) as db:
         delivery = db.query(AdDelivery).one()
         assert delivery.impression_confirmed is True
-        assert len([e for e in delivery.__dict__ if e == "id"]) == 1
+        assert db.query(AdEvent).filter(AdEvent.delivery_id == delivery.id, AdEvent.event_type == "impression").count() == 1
 
 
 def test_house_ad_is_used_when_no_commercial_creative_matches() -> None:
