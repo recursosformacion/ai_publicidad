@@ -30,6 +30,8 @@ jobs:
         run: python scripts/create_database.py --help
       - name: Check house-ad seed command starts correctly
         run: python scripts/seed_house_ads.py --help
+      - name: Check live delivery smoke test command starts correctly
+        run: python scripts/smoke_test_delivery.py --help
       - name: Ensure production-style seed refuses accidental SQLite writes
         shell: bash
         run: |
