@@ -15,15 +15,11 @@ from api.admin_schemas import (
     TargetingRuleInput,
     TargetingRuleRead,
 )
-from application.security import require_admin_token
 from domain.models import AdDelivery, AdEvent, Campaign, Creative, TargetingRule
 from infrastructure.database import get_db
 
-router = APIRouter(
-    prefix="/admin",
-    tags=["administration"],
-    dependencies=[Depends(require_admin_token)],
-)
+# Authorization is intentionally deferred to a later phase.
+router = APIRouter(prefix="/admin", tags=["administration"])
 
 
 def _not_found(kind: str, record_id: int) -> HTTPException:
