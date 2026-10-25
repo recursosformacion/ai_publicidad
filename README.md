@@ -2,7 +2,7 @@
 
 Servicio independiente de publicidad directa para OSAP/OpenMusicRepository. Gestiona clientes, campañas, anuncios, espacios publicitarios, selección de anuncios, impresiones, clics, redirecciones y estadísticas.
 
-El repositorio está en fase de diseño. Este README define el contrato funcional y la arquitectura inicial antes de implementar el código.
+El proyecto se implementará como servicio independiente **Python 3.11+ + FastAPI**, alineado con `AI_osap-auth`, `AI_osap-storage` y `AI_osap-support`. El contrato se irá cerrando con pruebas de integración antes de conectar `osap-app`.
 
 ## 1. Objetivos y principios
 
@@ -14,7 +14,7 @@ El repositorio está en fase de diseño. Este README define el contrato funciona
 - El servicio debe poder admitir otras aplicaciones en el futuro, aunque la primera integración sea `osap-app`.
 - El código no contiene credenciales ni secretos. La configuración se obtiene del entorno o de un archivo local ignorado por Git.
 - MySQL es la base de datos de producción. SQLite se utilizará para desarrollo y pruebas automatizadas.
-- La implementación puede hacerse en Python o PHP; antes de escoger se revisará la arquitectura de las aplicaciones OSAP existentes para reutilizar patrones y configuración sin copiar secretos ni acoplar el servicio innecesariamente.
+- **Stack decidido:** Python 3.11+, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic y MySQL/MariaDB en producción; SQLite para pruebas. Se reutilizarán las convenciones de configuración y autenticación de servicios OSAP, sin copiar secretos ni acoplar el servicio a la base de datos del catálogo.
 
 ## 2. Arquitectura lógica
 
@@ -52,7 +52,7 @@ Catálogo inicial propuesto (ampliable y versionado):
 
 Cada solicitud podrá incluir, cuando proceda, `entity_type` y `entity_id` (por ejemplo, obra concreta o persona concreta). No se debe usar la URL como único identificador de página.
 
-La lista definitiva deberá contrastarse con las rutas y componentes reales de `osap-app`. Los códigos se documentarán en ambos proyectos; si se necesita una ruta de descubrimiento, la API publicará los tipos admitidos.
+**Estado de validación:** la documentación accesible de `AI_GAMEPC2` describe el contrato del frontend como pendiente y no permite confirmar todas las rutas públicas actuales de `osap-app`. Por tanto, esta lista sigue siendo una propuesta de integración, no una afirmación de que cada página exista. Antes de conectar anuncios se deberá contrastar con el código real del frontend y mantener los códigos estables en ambos proyectos.
 
 ## 4. Espacios publicitarios y formatos
 
@@ -122,7 +122,7 @@ La factura fiscal y la contabilidad deben diseñarse según los requisitos aplic
 
 ## 7. Contrato inicial de API
 
-Las rutas son una propuesta de diseño, no una implementación existente.
+Las rutas son el contrato inicial previsto para FastAPI; se validarán mediante pruebas antes de integrarlas en `osap-app`.
 
 ### Solicitar un anuncio
 
@@ -207,7 +207,7 @@ Se usarán claves foráneas, índices para las búsquedas de selección y fechas
 - Variables de entorno orientativas: `DATABASE_URL` o configuración separada de host, puerto, nombre de base, usuario y contraseña; `APP_ENV`; `PUBLIC_BASE_URL`; configuración de claves de las aplicaciones.
 - Los secretos locales deben quedar fuera de Git y los ejemplos de configuración usar valores ficticios.
 
-Antes de elegir Python o PHP, revisar el stack de los servicios OSAP existentes, la forma en que se despliegan y las librerías de acceso a MySQL. La elección debe reducir el coste de mantenimiento e integración, no basarse solo en preferencia.
+La decisión de stack ya está tomada: Python + FastAPI, coherente con los servicios OSAP actuales. La configuración seguirá el patrón del ecosistema: variables de entorno `AI_PUBLICIDAD_*` con precedencia sobre `osap.toml` local ignorado por Git, si se adopta el cargador TOML común. En producción, el arranque fallará si faltan parámetros obligatorios o se intenta usar configuración de prueba.
 
 ## 10. Seguridad, privacidad y fiabilidad
 
@@ -223,11 +223,12 @@ Antes de elegir Python o PHP, revisar el stack de los servicios OSAP existentes,
 
 ## 11. Fases de implementación
 
-### Fase 1 — Diseño y prototipo
-- Confirmar el stack técnico y la configuración real de los servicios OSAP.
-- Cerrar la tipología de páginas con `osap-app`.
+### Fase 1 — Prototipo funcional
+- Crear la aplicación FastAPI, configuración segura y endpoints de salud.
 - Crear migraciones compatibles con MySQL y SQLite.
-- Crear anuncios propios de reserva y probar selección por página/ubicación.
+- Implementar selección de anuncios comerciales y anuncios propios de reserva.
+- Probar selección por página/ubicación y eventos idempotentes.
+- Cerrar la tipología de páginas cuando se disponga del código real de `osap-app`.
 
 ### Fase 2 — API funcional
 - Entrega de anuncios.
