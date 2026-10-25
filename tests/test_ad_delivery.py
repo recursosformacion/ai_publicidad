@@ -1,6 +1,7 @@
-from domain.models import AdDelivery, AdEvent, Campaign, Creative, TargetingRule
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+from domain.models import AdDelivery, AdEvent, Campaign, Creative, TargetingRule
 
 
 def _serve_payload() -> dict:
