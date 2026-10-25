@@ -30,3 +30,10 @@ jobs:
         run: python scripts/create_database.py --help
       - name: Check house-ad seed command starts correctly
         run: python scripts/seed_house_ads.py --help
+      - name: Ensure production-style seed refuses accidental SQLite writes
+        shell: bash
+        run: |
+          if python scripts/seed_house_ads.py --apply; then
+            echo "ERROR: seed unexpectedly allowed SQLite writes without --allow-sqlite"
+            exit 1
+          fi
