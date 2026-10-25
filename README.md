@@ -179,6 +179,18 @@ El token identifica una entrega válida. El servidor registra el clic y obtiene 
 - `GET /api/v1/metadata/page-types`: opcionalmente, catálogo versionado de tipos de página.
 - Administración: rutas separadas, autenticadas y no accesibles a la clave pública de `osap-app`.
 
+### API de administración implementada
+
+Las siguientes rutas están disponibles bajo `/api/v1/admin` y requieren la credencial de servicio en producción (cabecera `X-OSAP-Service-Token`). La interfaz administrativa web puede construirse sobre este contrato; el CRUD aquí es la API, no todavía una pantalla de gestión.
+
+- **Campañas:** `GET/POST /campaigns`, `GET/PUT/DELETE /campaigns/{id}`.
+- **Creatividades:** `GET/POST /creatives`, `GET/PUT/DELETE /creatives/{id}`.
+- **Segmentación:** `GET/POST /targeting-rules`, `GET/PUT/DELETE /targeting-rules/{id}`.
+- **Histórico de entregas:** `GET /deliveries` y `GET /deliveries/{id}`, con filtros por campaña o creatividad.
+- **Histórico de eventos:** `GET /events` y `GET /events/{id}`, con filtros por tipo de evento y entrega.
+
+Las tablas de configuración tienen CRUD. `ad_deliveries` y `ad_events` son datos operativos e históricos: se consultan, pero no se editan ni borran desde la administración para no falsear métricas ni romper relaciones. Si una campaña o creatividad ya tiene entregas, se debe pausar en lugar de borrarla. Las reglas de segmentación admiten `application`, `page_type`, `placement`, `language`, `entity_type` y `entity_id`, con efecto `include` o `exclude`.
+
 ## 8. Modelo de datos inicial
 
 Tablas previstas para la primera migración:
@@ -222,7 +234,25 @@ Se usarán claves foráneas, índices para las búsquedas de selección y fechas
 - En desarrollo, `.env.example` mantiene SQLite como opción segura predeterminada. La API no crea tablas automáticamente sobre MySQL; el esquema se gestiona mediante Alembic.
 - Producción requiere `AI_PUBLICIDAD_SERVICE_TOKEN`, `AI_PUBLICIDAD_PUBLIC_BASE_URL` con HTTPS y una conexión que termine en `OSAP_PUBLICIDAD`.
 
-## 10. Seguridad, privacidad y fiabilidad
+## 10. Prueba HTTP real de entrega y fallback
+
+Los tests automáticos usan una base SQLite en memoria y ejercitan las rutas HTTP de FastAPI; **no utilizan ni vacían `OSAP_PUBLICIDAD`**. Para comprobar también el servicio arrancado y la base configurada en tu máquina, se incluye un smoke test explícito.
+
+Con el servicio iniciado y su configuración comprobada, ejecuta primero una simulación (solo consulta `/health`):
+
+```powershell
+python scripts/smoke_test_delivery.py
+```
+
+Después, para crear datos de prueba mediante el CRUD, solicitar un anuncio comercial, pausar esa campaña por API y verificar que la siguiente solicitud devuelve una creatividad propia de OSAP:
+
+```powershell
+python scripts/smoke_test_delivery.py --apply
+```
+
+Si trabajas desde cero, instala también las dependencias de desarrollo (`python -m pip install -e ".[dev]"`) para disponer de `httpx`. El proceso requiere que exista al menos una campaña propia activa con una creatividad aprobada compatible con el formato `text` y el idioma solicitado. La prueba deja la campaña de prueba pausada y conserva sus entregas en el histórico deliberadamente; no elimina registros históricos. Revisa el host/base de datos del servicio antes de usar `--apply`.
+
+## 11. Seguridad, privacidad y fiabilidad
 
 - Autenticación entre `osap-app` y el servicio mediante credencial específica de aplicación, rotación y límites de uso; nunca usar una clave administrativa en el navegador.
 - Validación de todos los parámetros y de los recursos publicitarios antes de publicarlos.
