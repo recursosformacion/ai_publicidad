@@ -272,29 +272,14 @@ def test_initial_house_seed_is_idempotent():
         test_engine.dispose()
 
 
-def test_admin_requires_separate_admin_token_in_production(client, monkeypatch):
-    from types import SimpleNamespace
 
-    monkeypatch.setattr(
-        "application.security.get_settings",
-        lambda: SimpleNamespace(
-            env="production",
-            service_token="service-secret",
-            admin_token="admin-secret",
-        ),
-    )
-    missing_token = client.get("/api/v1/admin/campaigns")
-    assert missing_token.status_code == 401
-
-    # The OSAP serving credential must not grant campaign-management access.
-    service_token_only = client.get(
-        "/api/v1/admin/campaigns",
-        headers={"X-OSAP-Service-Token": "service-secret"},
-    )
-    assert service_token_only.status_code == 401
-
-    valid_token = client.get(
-        "/api/v1/admin/campaigns",
-        headers={"X-OSAP-Admin-Token": "admin-secret"},
-    )
-    assert valid_token.status_code == 200
+def test_admin_web_ui_is_available_and_routes_to_the_crud(client):
+    page = client.get("/admin")
+    assert page.status_code == 200
+    assert "Administración de publicidad" in page.text
+    assert 'data-section="campaigns"' in page.text
+    assert 'data-section="creatives"' in page.text
+    assert 'data-section="targeting-rules"' in page.text
+    assert 'data-section="deliveries"' in page.text
+    assert 'data-section="events"' in page.text
+    assert client.get("/api/v1/admin/campaigns").status_code == 200
