@@ -39,3 +39,31 @@ def test_osap_toml_missing_connection_is_not_used(tmp_path: Path) -> None:
 
 def test_missing_osap_toml_returns_none(tmp_path: Path) -> None:
     assert database_url_from_osap_toml(tmp_path / "does-not-exist.toml") is None
+
+
+def test_settings_reads_osap_config_env_and_overrides_database_name(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from infrastructure.config import Settings
+
+    config_file = tmp_path / "osap.toml"
+    config_file.write_text(
+        '[db]\n'
+        'host = "db.example.test"\n'
+        'name = "osap-api"\n'
+        'user = "ad_service"\n'
+        'password = "not-a-real-secret"\n'
+        'port = 3306\n',
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("AI_PUBLICIDAD_DATABASE_URL", raising=False)
+    monkeypatch.setenv("OSAP_CONFIG", str(config_file))
+    monkeypatch.setenv("AI_PUBLICIDAD_ENV", "development")
+
+    settings = Settings(_env_file=None)
+    url = make_url(settings.database_url)
+
+    assert settings.osap_config_path == str(config_file)
+    assert url.database == "OSAP_PUBLICIDAD"
+    assert url.host == "db.example.test"
+    assert url.username == "ad_service"
