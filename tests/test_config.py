@@ -97,3 +97,45 @@ def test_settings_does_not_read_sibling_osap_api_toml(
 
     settings = Settings(_env_file=None)
     assert make_url(settings.database_url).drivername == "sqlite"
+
+
+def test_settings_prefers_this_services_own_osap_toml_over_any_sibling(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from infrastructure.config import Settings
+
+    app_dir = tmp_path / "ai_publicidad"
+    osap_api_dir = tmp_path / "osap-api"
+    app_dir.mkdir()
+    osap_api_dir.mkdir()
+    (app_dir / "osap.toml").write_text(
+        '[db]\n'
+        'host = "publicidad-db.example.test"\n'
+        'name = "OSAP_PUBLICIDAD"\n'
+        'user = "publicidad_user"\n'
+        'password = "publicidad-secret"\n',
+        encoding="utf-8",
+    )
+    (osap_api_dir / "osap.toml").write_text(
+        '[db]\n'
+        'host = "osap-api-db.example.test"\n'
+        'name = "osap-api"\n'
+        'user = "osap_api_user"\n'
+        'password = "osap-api-secret"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(app_dir)
+    for variable in (
+        "AI_PUBLICIDAD_DATABASE_URL",
+        "AI_PUBLICIDAD_OSAP_CONFIG",
+        "OSAP_CONFIG",
+    ):
+        monkeypatch.delenv(variable, raising=False)
+    monkeypatch.setenv("AI_PUBLICIDAD_ENV", "development")
+
+    settings = Settings(_env_file=None)
+    url = make_url(settings.database_url)
+
+    assert url.database == "OSAP_PUBLICIDAD"
+    assert url.host == "publicidad-db.example.test"
+    assert url.username == "publicidad_user"
