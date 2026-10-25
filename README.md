@@ -191,6 +191,8 @@ Las rutas CRUD están disponibles bajo `/api/v1/admin`. La pantalla web está en
 
 Las tablas de configuración tienen CRUD. `ad_deliveries` y `ad_events` son datos operativos e históricos: se consultan, pero no se editan ni borran desde la administración para no falsear métricas ni romper relaciones. Si una campaña o creatividad ya tiene entregas, se debe pausar en lugar de borrarla. Las reglas de segmentación admiten `application`, `page_type`, `placement`, `language`, `entity_type` y `entity_id`, con efecto `include` o `exclude`.
 
+En el panel `/admin`, cada listado muestra los campos principales y ofrece **Ver**. En campañas, creatividades y reglas también están **Editar** y **Borrar**, además de **Nuevo**. Los formularios usan los campos del modelo y los selectores de campaña/creatividad muestran sus registros asociados. El filtro busca dentro del listado actual.
+
 ## 8. Modelo de datos inicial
 
 **Tablas que existen en el esquema funcional actual:**
@@ -269,6 +271,7 @@ Si trabajas desde cero, instala también las dependencias de desarrollo (`python
 - `GET /r/{token}`: registra el clic y redirige al destino almacenado en la creatividad, nunca a una URL recibida en la petición.
 - Modelos SQLAlchemy y primera migración Alembic; esquema local automático solo en desarrollo/pruebas.
 - CRUD REST para campañas, creatividades y reglas de segmentación; consultas paginadas de entregas y eventos.
+- Panel web en `/admin` con navegación entre listados, filtros, detalle en ventana, formularios de alta/edición y confirmación de borrado.
 - Pruebas de integración HTTP usando una SQLite en memoria aislada, sin borrar ni escribir en la base configurada de OSAP.
 - Script de prueba real `scripts/smoke_test_delivery.py`, protegido tras `--apply`, para comprobar el endpoint HTTP contra el servicio y su base configurada.
 - Pruebas de entrega comercial, fallback propio, idempotencia de impresiones, redirección segura, CRUD y carga de la interfaz web.
@@ -288,7 +291,7 @@ python scripts/seed_house_ads.py --apply --allow-sqlite
 uvicorn api.main:app --host 127.0.0.1 --port 8305
 ```
 
-En PowerShell, sustituye `cp .env.example .env` por `Copy-Item .env.example .env`. La primera llamada a `seed_house_ads.py` es una simulación y no escribe nada; `--apply` confirma la carga. El comando valida que una conexión MySQL apunte a `OSAP_PUBLICIDAD` y es idempotente: si campaña y creatividad ya existen, no duplica filas. En SQLite se niega a escribir salvo que añadas `--allow-sqlite`; esa opción es solo para desarrollo local. Para una carga real en MySQL, usa el `osap.toml` privado de esta aplicación y revisa la simulación antes de ejecutar `--apply`. Para ejecutar pruebas: `pytest -q`.
+En PowerShell, sustituye `cp .env.example .env` por `Copy-Item .env.example .env`. La primera llamada a `seed_house_ads.py` es una simulación y no escribe nada; `--apply` confirma la carga. El comando valida que una conexión MySQL apunte a `OSAP_PUBLICIDAD` y es idempotente: si campaña y creatividad ya existen, no duplica filas. En SQLite se niega a escribir salvo que añadas `--allow-sqlite`; esa opción es solo para desarrollo local. Para una carga real en MySQL, usa el `osap.toml` privado de esta aplicación y revisa la simulación antes de ejecutar `--apply`. Para ejecutar pruebas: `pytest -q`. Con el servicio arrancado, abre **http://127.0.0.1:8305/admin** para utilizar el panel local.
 
 ### Pendiente antes de integrar en producción
 - Confirmar el resultado de CI y ejecutar el smoke test contra el servicio arrancado y la conexión real, después de comprobar que apunta a `OSAP_PUBLICIDAD`.
