@@ -2,7 +2,7 @@
 
 Servicio independiente de publicidad directa para OSAP/OpenMusicRepository. Gestiona clientes, campañas, anuncios, espacios publicitarios, selección de anuncios, impresiones, clics, redirecciones y estadísticas.
 
-El proyecto se implementará como servicio independiente **Python 3.11+ + FastAPI**, alineado con `AI_osap-auth`, `AI_osap-storage` y `AI_osap-support`. El contrato se irá cerrando con pruebas de integración antes de conectar `osap-app`.
+El proyecto es un servicio independiente **Python 3.11+ + FastAPI**, alineado con `AI_osap-auth`, `AI_osap-storage` y `AI_osap-support`. Ya existe un primer núcleo funcional; el contrato de integración con `osap-app` sigue pendiente de validar con el código real del frontend.
 
 ## 1. Objetivos y principios
 
@@ -221,14 +221,23 @@ La decisión de stack ya está tomada: Python + FastAPI, coherente con los servi
 - Si se usan cookies, perfiles o tecnologías de seguimiento no esenciales, analizar antes su necesidad y los requisitos de consentimiento aplicables.
 - La API debe tener tiempos de espera, límites de tamaño y una respuesta de reserva definida para que un fallo publicitario no rompa las páginas de OSAP.
 
-## 11. Fases de implementación
+## 11. Estado de implementación
 
-### Fase 1 — Prototipo funcional
-- Crear la aplicación FastAPI, configuración segura y endpoints de salud.
-- Crear migraciones compatibles con MySQL y SQLite.
-- Implementar selección de anuncios comerciales y anuncios propios de reserva.
-- Probar selección por página/ubicación y eventos idempotentes.
-- Cerrar la tipología de páginas cuando se disponga del código real de `osap-app`.
+### Implementado en el prototipo
+- Aplicación FastAPI y `GET /health`.
+- Catálogo provisional en `GET /api/v1/metadata/page-types`.
+- `POST /api/v1/ads/serve`: selecciona creatividades aprobadas, prioriza campañas comerciales y usa anuncios propios como reserva; permite reglas de inclusión/exclusión por aplicación, página, espacio, idioma y entidad.
+- `POST /api/v1/events/impression`: confirma la impresión con protección de idempotencia.
+- `GET /r/{token}`: registra el clic y redirige al destino almacenado en la creatividad, nunca a una URL recibida en la petición.
+- Modelos SQLAlchemy y primera migración Alembic; esquema local automático solo en desarrollo/pruebas.
+- Pruebas iniciales de entrega comercial, fallback propio, impresiones y redirección.
+
+### Pendiente antes de integrar en producción
+- Ejecutar la suite en un entorno local con dependencias instaladas y corregir cualquier fallo.
+- Revisar la idempotencia bajo peticiones concurrentes y endurecer autenticación/limitación de uso.
+- Crear un proceso de inicialización explícito para insertar los anuncios propios iniciales (no se ha ejecutado ningún seed ni migración de producción).
+- Validar la taxonomía con el código real de `osap-app`.
+- Completar administración de clientes, campañas, creatividades y contratos; informes y retención de eventos.
 
 ### Fase 2 — API funcional
 - Entrega de anuncios.
