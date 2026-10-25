@@ -69,7 +69,7 @@ def test_settings_reads_osap_config_env_and_overrides_database_name(
     assert url.username == "ad_service"
 
 
-def test_settings_discovers_sibling_osap_api_toml(
+def test_settings_does_not_read_sibling_osap_api_toml(
     tmp_path: Path, monkeypatch
 ) -> None:
     from infrastructure.config import Settings
@@ -96,4 +96,4 @@ def test_settings_discovers_sibling_osap_api_toml(
     monkeypatch.setenv("AI_PUBLICIDAD_ENV", "development")
 
     settings = Settings(_env_file=None)
-    assert make_url(settings.database_url).database == "OSAP_PUBLICIDAD"
+    assert make_url(settings.database_url).drivername == "sqlite"
