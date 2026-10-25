@@ -85,6 +85,11 @@ def main() -> None:
         action="store_true",
         help="Confirma la escritura idempotente. Sin esta opción solo muestra el plan.",
     )
+    parser.add_argument(
+        "--allow-sqlite",
+        action="store_true",
+        help="Permite la carga local en SQLite; no usar para inicializar la base MySQL de OSAP.",
+    )
     args = parser.parse_args()
 
     settings = get_settings()
@@ -100,6 +105,11 @@ def main() -> None:
     elif url.drivername.startswith("sqlite"):
         if settings.env == "production":
             raise SystemExit("Producción no puede usar SQLite.")
+        if args.apply and not args.allow_sqlite:
+            raise SystemExit(
+                "La configuración apunta a SQLite, no a OSAP_PUBLICIDAD. "
+                "Revisa tu osap.toml; usa --allow-sqlite solo para una prueba local intencionada."
+            )
     else:
         raise SystemExit("Motor de base de datos no compatible para esta carga inicial.")
 
