@@ -1,6 +1,6 @@
 # ai_publicidad
 
-Servicio independiente de publicidad directa para OSAP/OpenMusicRepository. Gestiona clientes, campañas, anuncios, espacios publicitarios, selección de anuncios, impresiones, clics, redirecciones y estadísticas.
+Servicio independiente de publicidad directa para OSAP/OpenMusicRepository. El núcleo actual gestiona campañas, creatividades, segmentación, entrega de anuncios, impresiones, clics y redirecciones. El modelo de clientes/anunciantes, contratos, espacios configurables y una pantalla web de administración todavía está pendiente.
 
 El proyecto es un servicio independiente **Python 3.11+ + FastAPI**, alineado con `AI_osap-auth`, `AI_osap-storage` y `AI_osap-support`. Ya existe un primer núcleo funcional; el contrato de integración con `osap-app` sigue pendiente de validar con el código real del frontend.
 
@@ -193,22 +193,17 @@ Las tablas de configuración tienen CRUD. `ad_deliveries` y `ad_events` son dato
 
 ## 8. Modelo de datos inicial
 
-Tablas previstas para la primera migración:
+**Tablas que existen en el esquema funcional actual:**
 
-1. `applications`
-2. `advertisers`
-3. `campaigns`
-4. `placements`
-5. `creatives`
-6. `targeting_rules`
-7. `orders` (o `contracts`, según el modelo comercial final)
-8. `ad_deliveries` (entrega e identificador de impresión)
-9. `ad_events`
-10. `house_ad_settings` o clasificación equivalente en campañas/creatividades
-11. `admin_users` si la administración necesita usuarios propios
-12. `audit_log`
+1. `campaigns`: estado, fechas, prioridad y marca de anuncio propio.
+2. `creatives`: título, contenido, formato, idioma, destino y estado de aprobación.
+3. `targeting_rules`: reglas de inclusión/exclusión por aplicación, página, ubicación, idioma y entidad.
+4. `ad_deliveries`: entrega, token de impresión y confirmación de impresión.
+5. `ad_events`: impresiones y clics registrados.
 
-Se usarán claves foráneas, índices para las búsquedas de selección y fechas almacenadas de forma consistente. Los eventos de alto volumen deben poder archivarse o resumirse sin perder los totales comerciales.
+**Entidades previstas para fases posteriores, que todavía no forman parte de esta migración:** `applications`, `advertisers`, `placements`, `orders/contracts`, configuración específica de anuncios propios, usuarios administrativos y auditoría.
+
+Se usan claves foráneas e índices en las tablas existentes. Las entregas y los eventos se conservan como histórico; informes más amplios, archivo de eventos y retención deben diseñarse en fases posteriores.
 
 ## 9. Base de datos y configuración
 
