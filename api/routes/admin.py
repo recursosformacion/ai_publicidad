@@ -42,7 +42,7 @@ def list_campaigns(
     limit: int = Query(default=100, ge=1, le=200),
     db: Session = Depends(get_db),
 ) -> list[Campaign]:
-    return list(db.scalars(select(Campaign).order_by(Campaign.id).offset(offset).limit(limit)).all())
+    return list(db.scalars(select(Campaign).order_by(Campaign.id.desc()).offset(offset).limit(limit)).all())
 
 
 @router.post("/campaigns", response_model=CampaignRead, status_code=status.HTTP_201_CREATED)
@@ -105,7 +105,7 @@ def list_creatives(
     query = select(Creative)
     if campaign_id is not None:
         query = query.where(Creative.campaign_id == campaign_id)
-    query = query.order_by(Creative.id).offset(offset).limit(limit)
+    query = query.order_by(Creative.id.desc()).offset(offset).limit(limit)
     return list(db.scalars(query).all())
 
 
@@ -172,7 +172,7 @@ def list_targeting_rules(
     query = select(TargetingRule)
     if creative_id is not None:
         query = query.where(TargetingRule.creative_id == creative_id)
-    query = query.order_by(TargetingRule.id).offset(offset).limit(limit)
+    query = query.order_by(TargetingRule.id.desc()).offset(offset).limit(limit)
     return list(db.scalars(query).all())
 
 
