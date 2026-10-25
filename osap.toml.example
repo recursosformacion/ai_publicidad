@@ -1,0 +1,9 @@
+# Configuración PRIVADA de ai_publicidad.
+# Copia este fichero a osap.toml y rellena la conexión a partir de osap-api/osap.toml.
+# No introduzcas credenciales reales en este archivo de ejemplo ni lo renombres en Git.
+[db]
+host = "127.0.0.1"
+port = 3306
+name = "OSAP_PUBLICIDAD"
+user = ""
+password = ""
