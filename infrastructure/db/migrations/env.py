@@ -2,21 +2,39 @@ from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import make_url
 
 from domain.models import Base
-from infrastructure.config import get_settings
+from infrastructure.config import DATABASE_NAME, get_settings
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%", "%%"))
+settings = get_settings()
+if not settings.database_url:
+    raise RuntimeError("No hay conexión configurada para las migraciones.")
+
+database_url = make_url(settings.database_url)
+if database_url.drivername.startswith("mysql") and database_url.database != DATABASE_NAME:
+    raise RuntimeError(
+        f"Migración bloqueada: la base configurada debe ser {DATABASE_NAME}, "
+        f"no {database_url.database!r}. Comprueba AI_PUBLICIDAD_DATABASE_URL y osap.toml."
+    )
+
+# Fail closed before a migration could touch any schema other than OSAP_PUBLICIDAD.
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
-    context.configure(url=url, target_metadata=target_metadata, literal_binds=True, dialect_opts={"paramstyle": "named"})
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
     with context.begin_transaction():
         context.run_migrations()
 
