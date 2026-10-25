@@ -1,6 +1,6 @@
 # ai_publicidad
 
-Servicio independiente de publicidad directa para OSAP/OpenMusicRepository. El núcleo actual gestiona campañas, creatividades, segmentación, entrega de anuncios, impresiones, clics y redirecciones. El modelo de clientes/anunciantes, contratos, espacios configurables y una pantalla web de administración todavía está pendiente.
+Servicio independiente de publicidad directa para OSAP/OpenMusicRepository. El núcleo actual gestiona campañas, creatividades, segmentación, entrega de anuncios, impresiones, clics y redirecciones. El modelo de clientes/anunciantes, contratos y espacios configurables todavía está pendiente; la primera pantalla web de mantenimiento ya está disponible en `/admin`.
 
 El proyecto es un servicio independiente **Python 3.11+ + FastAPI**, alineado con `AI_osap-auth`, `AI_osap-storage` y `AI_osap-support`. Ya existe un primer núcleo funcional; el contrato de integración con `osap-app` sigue pendiente de validar con el código real del frontend.
 
