@@ -15,14 +15,14 @@ from api.admin_schemas import (
     TargetingRuleInput,
     TargetingRuleRead,
 )
-from application.security import require_service_token
+from application.security import require_admin_token
 from domain.models import AdDelivery, AdEvent, Campaign, Creative, TargetingRule
 from infrastructure.database import get_db
 
 router = APIRouter(
     prefix="/admin",
     tags=["administration"],
-    dependencies=[Depends(require_service_token)],
+    dependencies=[Depends(require_admin_token)],
 )
 
 
