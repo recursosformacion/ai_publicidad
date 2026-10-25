@@ -1,4 +1,4 @@
-"""Authenticated administration for campaign configuration and read-only history."""
+"""Administration API for campaign configuration and read-only history."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
