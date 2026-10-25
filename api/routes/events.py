@@ -1,9 +1,9 @@
-"""Idempotent impression confirmation."""
+"""Idempotent impression confirmation, including concurrent duplicate requests."""
 
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from api.schemas import ImpressionRequest
@@ -20,11 +20,22 @@ def confirm_impression(request: ImpressionRequest, db: Session = Depends(get_db)
     if delivery is None:
         raise HTTPException(status_code=404, detail="Unknown impression identifier")
 
-    if not delivery.impression_confirmed:
-        now = datetime.now(timezone.utc)
-        delivery.impression_confirmed = True
-        delivery.impression_confirmed_at = now
-        db.add(AdEvent(delivery_id=delivery.id, event_type="impression", deduplication_key=f"impression:{delivery.id}"))
-        db.commit()
-
-    return {"accepted": True, "counted": True}
+    # A conditional UPDATE makes the first confirmation the only request allowed
+    # to insert the event, even if multiple requests arrive at the same time.
+    now = datetime.now(timezone.utc)
+    result = db.execute(
+        update(AdDelivery)
+        .where(AdDelivery.id == delivery.id, AdDelivery.impression_confirmed.is_(False))
+        .values(impression_confirmed=True, impression_confirmed_at=now)
+    )
+    if result.rowcount == 1:
+        db.add(
+            AdEvent(
+                delivery_id=delivery.id,
+                event_type="impression",
+                occurred_at=now,
+                deduplication_key=f"impression:{delivery.id}",
+            )
+        )
+    db.commit()
+    return {"accepted": True, "counted": result.rowcount == 1}
