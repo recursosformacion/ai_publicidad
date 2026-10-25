@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 from api.routes.ads import router as ads_router
 from api.routes.admin import router as admin_router
+from api.routes.admin_ui import router as admin_ui_router
 from api.routes.clicks import router as clicks_router
 from api.routes.events import router as events_router
 from api.routes.health import router as health_router
@@ -40,6 +41,7 @@ app.include_router(health_router)
 app.include_router(metadata_router, prefix="/api/v1")
 app.include_router(ads_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
+app.include_router(admin_ui_router)
 app.include_router(events_router, prefix="/api/v1")
 app.include_router(clicks_router)
 
