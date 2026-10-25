@@ -271,17 +271,29 @@ def test_initial_house_seed_is_idempotent():
         test_engine.dispose()
 
 
-def test_admin_requires_service_token_in_production(client, monkeypatch):
+def test_admin_requires_separate_admin_token_in_production(client, monkeypatch):
     from types import SimpleNamespace
 
     monkeypatch.setattr(
         "application.security.get_settings",
-        lambda: SimpleNamespace(env="production", service_token="test-secret"),
+        lambda: SimpleNamespace(
+            env="production",
+            service_token="service-secret",
+            admin_token="admin-secret",
+        ),
     )
     missing_token = client.get("/api/v1/admin/campaigns")
     assert missing_token.status_code == 401
+
+    # The OSAP serving credential must not grant campaign-management access.
+    service_token_only = client.get(
+        "/api/v1/admin/campaigns",
+        headers={"X-OSAP-Service-Token": "service-secret"},
+    )
+    assert service_token_only.status_code == 401
+
     valid_token = client.get(
         "/api/v1/admin/campaigns",
-        headers={"X-OSAP-Service-Token": "test-secret"},
+        headers={"X-OSAP-Admin-Token": "admin-secret"},
     )
     assert valid_token.status_code == 200
