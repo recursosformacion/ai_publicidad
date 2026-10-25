@@ -1,5 +1,8 @@
 """FastAPI application entry point for ai_publicidad."""
 
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+
 from fastapi import FastAPI
 
 from api.routes.ads import router as ads_router
@@ -12,10 +15,25 @@ from domain.models import Base
 from infrastructure.config import get_settings
 from infrastructure.database import engine
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Initialize only local SQLite; MySQL schemas always use migrations."""
+    settings = get_settings()
+    if (
+        settings.env != "production"
+        and settings.database_url
+        and settings.database_url.startswith("sqlite")
+    ):
+        Base.metadata.create_all(bind=engine)
+    yield
+
+
 app = FastAPI(
     title="ai_publicidad",
     description="Servicio independiente de publicidad directa.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.include_router(health_router)
@@ -24,14 +42,6 @@ app.include_router(ads_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
 app.include_router(events_router, prefix="/api/v1")
 app.include_router(clicks_router)
-
-
-@app.on_event("startup")
-def initialize_development_schema() -> None:
-    """Auto-create schema only for local SQLite; MySQL schemas always use migrations."""
-    settings = get_settings()
-    if settings.env != "production" and settings.database_url and settings.database_url.startswith("sqlite"):
-        Base.metadata.create_all(bind=engine)
 
 
 def run() -> None:
