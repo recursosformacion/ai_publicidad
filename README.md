@@ -256,10 +256,11 @@ pip install -e ".[dev]"
 cp .env.example .env
 alembic upgrade head
 python scripts/seed_house_ads.py
+python scripts/seed_house_ads.py --apply
 uvicorn api.main:app --host 127.0.0.1 --port 8305
 ```
 
-En PowerShell, sustituye `cp .env.example .env` por `Copy-Item .env.example .env`. El inicializador solo crea un anuncio propio en desarrollo/pruebas y se niega a ejecutarse si `AI_PUBLICIDAD_ENV=production`. Para ejecutar pruebas: `pytest -q`.
+En PowerShell, sustituye `cp .env.example .env` por `Copy-Item .env.example .env`. La primera llamada a `seed_house_ads.py` es una simulación y no escribe nada; `--apply` confirma la carga. El comando valida que una conexión MySQL apunte a `OSAP_PUBLICIDAD` y es idempotente: si campaña y creatividad ya existen, no duplica filas. Para una carga real en MySQL, usa el `osap.toml` privado de esta aplicación y revisa la simulación antes de ejecutar `--apply`. Para ejecutar pruebas: `pytest -q`.
 
 ### Pendiente antes de integrar en producción
 - Ejecutar la suite en un entorno local con dependencias instaladas y corregir cualquier fallo.
