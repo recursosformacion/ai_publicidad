@@ -247,7 +247,7 @@ Se usarán claves foráneas, índices para las búsquedas de selección y fechas
 
 ### Arranque local del prototipo
 
-El arranque siguiente es para desarrollo local con SQLite (valor predeterminado de `.env.example`) y no utiliza MySQL. Para usar la base MySQL de esta aplicación, crea su propio `osap.toml` desde `osap.toml.example`, copia los parámetros de conexión que corresponda reutilizar y fija `name = "OSAP_PUBLICIDAD"`. Deja vacía `AI_PUBLICIDAD_DATABASE_URL` para que lea ese fichero y sigue el procedimiento de la sección 9 antes de aplicar migraciones. La cuenta deberá tener permisos sobre ese esquema. El script `seed_house_ads.py` solo admite SQLite local.
+El arranque siguiente es para desarrollo local con SQLite (valor predeterminado de `.env.example`) y no utiliza MySQL. Para usar la base MySQL de esta aplicación, crea su propio `osap.toml` desde `osap.toml.example`, copia los parámetros de conexión que corresponda reutilizar y fija `name = "OSAP_PUBLICIDAD"`. Deja vacía `AI_PUBLICIDAD_DATABASE_URL` para que lea ese fichero y sigue el procedimiento de la sección 9 antes de aplicar migraciones. La cuenta deberá tener permisos sobre ese esquema. El script `seed_house_ads.py` admite SQLite para desarrollo solo con la opción explícita `--allow-sqlite`; para MySQL exige que la base de destino sea `OSAP_PUBLICIDAD`.
 
 ```bash
 python -m venv .venv
@@ -256,11 +256,11 @@ pip install -e ".[dev]"
 cp .env.example .env
 alembic upgrade head
 python scripts/seed_house_ads.py
-python scripts/seed_house_ads.py --apply
+python scripts/seed_house_ads.py --apply --allow-sqlite
 uvicorn api.main:app --host 127.0.0.1 --port 8305
 ```
 
-En PowerShell, sustituye `cp .env.example .env` por `Copy-Item .env.example .env`. La primera llamada a `seed_house_ads.py` es una simulación y no escribe nada; `--apply` confirma la carga. El comando valida que una conexión MySQL apunte a `OSAP_PUBLICIDAD` y es idempotente: si campaña y creatividad ya existen, no duplica filas. Para una carga real en MySQL, usa el `osap.toml` privado de esta aplicación y revisa la simulación antes de ejecutar `--apply`. Para ejecutar pruebas: `pytest -q`.
+En PowerShell, sustituye `cp .env.example .env` por `Copy-Item .env.example .env`. La primera llamada a `seed_house_ads.py` es una simulación y no escribe nada; `--apply` confirma la carga. El comando valida que una conexión MySQL apunte a `OSAP_PUBLICIDAD` y es idempotente: si campaña y creatividad ya existen, no duplica filas. En SQLite se niega a escribir salvo que añadas `--allow-sqlite`; esa opción es solo para desarrollo local. Para una carga real en MySQL, usa el `osap.toml` privado de esta aplicación y revisa la simulación antes de ejecutar `--apply`. Para ejecutar pruebas: `pytest -q`.
 
 ### Pendiente antes de integrar en producción
 - Ejecutar la suite en un entorno local con dependencias instaladas y corregir cualquier fallo.
