@@ -12,6 +12,11 @@ def main() -> None:
     settings = get_settings()
     if settings.env == "production":
         raise SystemExit("Refusing to seed production. Use a reviewed, explicit deployment procedure.")
+    if not settings.database_url or not settings.database_url.startswith("sqlite"):
+        raise SystemExit(
+            "Este script de datos de ejemplo solo admite SQLite local. "
+            "No se escribirán anuncios en un servidor MySQL/MariaDB."
+        )
 
     with SessionLocal() as db:
         existing = db.query(Campaign).filter(Campaign.name == "OSAP house ads - initial").first()
