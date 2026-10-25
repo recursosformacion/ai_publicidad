@@ -38,14 +38,28 @@ def _matches_targeting(db: Session, creative_id: int, request: ServeAdRequest) -
         "entity_type": request.page.entity_type or "",
         "entity_id": request.page.entity_id or "",
     }
+    # Inclusion rules for the same field are alternatives (OR); exclusion
+    # rules always win. Treating every include as a separate AND made it
+    # impossible to target a creative to more than one page type or language.
+    rules_by_type: dict[str, list[TargetingRule]] = {}
     for rule in rules:
-        actual = context.get(rule.rule_type)
-        if actual is None:
-            continue
-        matched = actual == rule.rule_value or rule.rule_value == "*"
-        if rule.effect == "include" and not matched:
+        rules_by_type.setdefault(rule.rule_type, []).append(rule)
+
+    for rule_type, typed_rules in rules_by_type.items():
+        actual = context.get(rule_type, "")
+        excluded = [
+            rule for rule in typed_rules
+            if rule.effect == "exclude"
+            and (actual == rule.rule_value or rule.rule_value == "*")
+        ]
+        if excluded:
             return False
-        if rule.effect == "exclude" and matched:
+
+        included = [rule for rule in typed_rules if rule.effect == "include"]
+        if included and not any(
+            actual == rule.rule_value or rule.rule_value == "*"
+            for rule in included
+        ):
             return False
     return True
 
