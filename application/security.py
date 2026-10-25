@@ -16,6 +16,15 @@ def require_service_token(x_osap_service_token: str = Header(default="")) -> Non
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid service credentials")
 
 
+def require_admin_token(x_osap_admin_token: str = Header(default="")) -> None:
+    """Protect administrative mutations with a key separate from the serving API key."""
+    settings = get_settings()
+    if settings.env != "production" and not settings.admin_token:
+        return
+    if not settings.admin_token or not hmac.compare_digest(x_osap_admin_token, settings.admin_token):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin credentials")
+
+
 def validate_destination(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in {"https", "http"} or not parsed.netloc or parsed.username or parsed.password:
