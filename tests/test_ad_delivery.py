@@ -71,6 +71,18 @@ def test_admin_crud_and_delivery_uses_commercial_then_house_fallback(client, tes
     rule_id = rule.json()["id"]
     assert client.get(f"/api/v1/admin/targeting-rules/{rule_id}").json()["rule_value"] == "work_detail"
 
+    # Multiple include values for the same field are alternatives, not an AND.
+    alternative_rule = client.post(
+        "/api/v1/admin/targeting-rules",
+        json={
+            "creative_id": commercial_creative_id,
+            "rule_type": "page_type",
+            "rule_value": "person_detail",
+            "effect": "include",
+        },
+    )
+    assert alternative_rule.status_code == 201
+
     house_campaign = client.post(
         "/api/v1/admin/campaigns",
         json=_campaign_payload("test OSAP fallback", priority=-100, house=True),
