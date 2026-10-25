@@ -247,7 +247,7 @@ Se usarán claves foráneas, índices para las búsquedas de selección y fechas
 
 ### Arranque local del prototipo
 
-El `.env.example` selecciona SQLite para que el arranque local no escriba accidentalmente en el MySQL de OSAP. Para utilizar la conexión privada existente, define `OSAP_CONFIG` (o `AI_PUBLICIDAD_OSAP_CONFIG`) y quita o deja vacía `AI_PUBLICIDAD_DATABASE_URL`; se usará host/usuario/contraseña de `[db]`, pero el esquema destino siempre será `OSAP_PUBLICIDAD`. La cuenta deberá tener permisos sobre ese esquema.
+El `.env.example` selecciona SQLite para que el arranque local no escriba accidentalmente en MySQL. Para usar la base de esta aplicación, crea su propio `osap.toml` desde `osap.toml.example`, copia los parámetros de conexión que corresponda reutilizar y fija `name = "OSAP_PUBLICIDAD"`. Deja vacía `AI_PUBLICIDAD_DATABASE_URL` para que lea ese fichero. La cuenta deberá tener permisos sobre ese esquema.
 
 ```bash
 python -m venv .venv
