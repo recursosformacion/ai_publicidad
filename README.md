@@ -232,6 +232,20 @@ La decisión de stack ya está tomada: Python + FastAPI, coherente con los servi
 - Modelos SQLAlchemy y primera migración Alembic; esquema local automático solo en desarrollo/pruebas.
 - Pruebas iniciales de entrega comercial, fallback propio, impresiones y redirección.
 
+### Arranque local del prototipo
+
+```bash
+python -m venv .venv
+# Activar el entorno virtual según el sistema operativo
+pip install -e ".[dev]"
+cp .env.example .env
+alembic upgrade head
+python scripts/seed_house_ads.py
+uvicorn api.main:app --host 127.0.0.1 --port 8305
+```
+
+En PowerShell, sustituye `cp .env.example .env` por `Copy-Item .env.example .env`. El inicializador solo crea un anuncio propio en desarrollo/pruebas y se niega a ejecutarse si `AI_PUBLICIDAD_ENV=production`. Para ejecutar pruebas: `pytest -q`.
+
 ### Pendiente antes de integrar en producción
 - Ejecutar la suite en un entorno local con dependencias instaladas y corregir cualquier fallo.
 - Revisar la idempotencia bajo peticiones concurrentes y endurecer autenticación/limitación de uso.
