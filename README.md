@@ -264,7 +264,7 @@ Si trabajas desde cero, instala también las dependencias de desarrollo (`python
 - Si se usan cookies, perfiles o tecnologías de seguimiento no esenciales, analizar antes su necesidad y los requisitos de consentimiento aplicables.
 - La API debe tener tiempos de espera, límites de tamaño y una respuesta de reserva definida para que un fallo publicitario no rompa las páginas de OSAP.
 
-## 11. Estado de implementación
+## 12. Estado de implementación
 
 ### Implementado en el prototipo
 - Aplicación FastAPI y `GET /health`.
@@ -273,7 +273,10 @@ Si trabajas desde cero, instala también las dependencias de desarrollo (`python
 - `POST /api/v1/events/impression`: confirma la impresión con protección de idempotencia.
 - `GET /r/{token}`: registra el clic y redirige al destino almacenado en la creatividad, nunca a una URL recibida en la petición.
 - Modelos SQLAlchemy y primera migración Alembic; esquema local automático solo en desarrollo/pruebas.
-- Pruebas iniciales de entrega comercial, fallback propio, impresiones y redirección.
+- CRUD REST autenticado para campañas, creatividades y reglas de segmentación; consultas paginadas de entregas y eventos.
+- Pruebas de integración HTTP usando una SQLite en memoria aislada, sin borrar ni escribir en la base configurada de OSAP.
+- Script de prueba real `scripts/smoke_test_delivery.py`, protegido tras `--apply`, para comprobar el endpoint HTTP contra el servicio y su base configurada.
+- Pruebas de entrega comercial, fallback propio, idempotencia de impresiones, redirección segura, CRUD y autenticación administrativa.
 
 ### Arranque local del prototipo
 
@@ -293,11 +296,12 @@ uvicorn api.main:app --host 127.0.0.1 --port 8305
 En PowerShell, sustituye `cp .env.example .env` por `Copy-Item .env.example .env`. La primera llamada a `seed_house_ads.py` es una simulación y no escribe nada; `--apply` confirma la carga. El comando valida que una conexión MySQL apunte a `OSAP_PUBLICIDAD` y es idempotente: si campaña y creatividad ya existen, no duplica filas. En SQLite se niega a escribir salvo que añadas `--allow-sqlite`; esa opción es solo para desarrollo local. Para una carga real en MySQL, usa el `osap.toml` privado de esta aplicación y revisa la simulación antes de ejecutar `--apply`. Para ejecutar pruebas: `pytest -q`.
 
 ### Pendiente antes de integrar en producción
-- Ejecutar la suite en un entorno local con dependencias instaladas y corregir cualquier fallo.
+- Confirmar el resultado de CI y ejecutar el smoke test contra el servicio arrancado y la conexión real, después de comprobar que apunta a `OSAP_PUBLICIDAD`.
+- Ejecutar `scripts/seed_house_ads.py --apply` en la base correcta si todavía no se ha cargado la campaña y creatividad propias iniciales.
 - Revisar la idempotencia bajo peticiones concurrentes y endurecer autenticación/limitación de uso.
-- Crear un proceso de inicialización explícito para insertar los anuncios propios iniciales (no se ha ejecutado ningún seed ni migración de producción).
 - Validar la taxonomía con el código real de `osap-app`.
-- Completar administración de clientes, campañas, creatividades y contratos; informes y retención de eventos.
+- Construir una pantalla web de administración si se necesita gestión visual; actualmente el CRUD implementado es la API REST.
+- Añadir las entidades comerciales aún no modeladas (clientes/anunciantes, espacios, contratos/pedidos) y después sus informes y políticas de retención.
 
 ### Fase 2 — API funcional
 - Entrega de anuncios.
@@ -316,7 +320,7 @@ En PowerShell, sustituye `cp .env.example .env` por `Copy-Item .env.example .env
 - Verificar tamaños, accesibilidad, idiomas y comportamiento móvil.
 - Probar caída del servicio y fallback de anuncios propios.
 
-## 12. Criterios de aceptación iniciales
+## 13. Criterios de aceptación iniciales
 
 - Una petición compatible devuelve un anuncio comercial activo si corresponde según las reglas de selección.
 - Si no existe una campaña comercial compatible, devuelve un anuncio propio válido.
