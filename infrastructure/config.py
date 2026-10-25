@@ -17,6 +17,21 @@ from sqlalchemy.engine import URL, make_url
 DATABASE_NAME = "OSAP_PUBLICIDAD"
 
 
+def locate_osap_config(explicit_path: str | None = None) -> Path | None:
+    """Locate OSAP's ignored osap.toml without requiring it to be copied into this repo."""
+    if explicit_path:
+        path = Path(explicit_path)
+        if not path.is_file():
+            raise ValueError("El fichero indicado por OSAP_CONFIG no existe o no es accesible.")
+        return path
+
+    # Typical local layout: D:/Proyectos/AI_OSAP/{ai_publicidad,osap-api}.
+    for candidate in (Path("osap.toml"), Path("../osap-api/osap.toml")):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def database_url_from_osap_toml(path: str | Path) -> str | None:
     """Build a URL for OSAP_PUBLICIDAD from [db] in osap.toml, without exposing secrets."""
     config_path = Path(path)
@@ -80,13 +95,10 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def resolve_database_and_validate(self) -> "Settings":
         explicit_url = bool(self.database_url and self.database_url.strip())
-        config_path = Path(self.osap_config_path) if self.osap_config_path else Path("osap.toml")
 
         if not explicit_url:
-            if self.osap_config_path and not config_path.is_file():
-                raise ValueError("El fichero indicado por OSAP_CONFIG no existe o no es accesible.")
-
-            if config_path.is_file():
+            config_path = locate_osap_config(self.osap_config_path)
+            if config_path is not None:
                 resolved_url = database_url_from_osap_toml(config_path)
                 if not resolved_url:
                     raise ValueError("El fichero osap.toml no contiene una conexión [db] completa.")
