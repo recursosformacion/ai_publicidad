@@ -245,7 +245,7 @@ Después, para crear datos de prueba mediante el CRUD, solicitar un anuncio come
 python scripts/smoke_test_delivery.py --apply
 ```
 
-Si trabajas desde cero, instala también las dependencias de desarrollo (`python -m pip install -e ".[dev]"`) para disponer de `httpx`. El proceso requiere que exista al menos una campaña propia activa con una creatividad aprobada compatible con el formato `text` y el idioma solicitado. La prueba deja la campaña de prueba pausada y conserva sus entregas en el histórico deliberadamente; no elimina registros históricos. Revisa el host/base de datos del servicio antes de usar `--apply`.
+Si trabajas desde cero, instala también las dependencias de desarrollo (`python -m pip install -e ".[dev]"`) para disponer de `httpx`. El proceso requiere que exista al menos una campaña propia activa con una creatividad aprobada compatible con el formato `text` y el idioma solicitado. La campaña temporal queda limitada mediante una regla a un identificador de aplicación único generado para la prueba, por lo que esa creatividad no es elegible para peticiones normales de `application=osap`. La campaña de prueba termina pausada y sus entregas permanecen en el histórico deliberadamente; no se borran registros históricos. Revisa el host/base de datos del servicio antes de usar `--apply`.
 
 ## 11. Seguridad, privacidad y fiabilidad
 
