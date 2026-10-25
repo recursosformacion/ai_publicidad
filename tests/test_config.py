@@ -67,3 +67,33 @@ def test_settings_reads_osap_config_env_and_overrides_database_name(
     assert url.database == "OSAP_PUBLICIDAD"
     assert url.host == "db.example.test"
     assert url.username == "ad_service"
+
+
+def test_settings_discovers_sibling_osap_api_toml(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from infrastructure.config import Settings
+
+    app_dir = tmp_path / "ai_publicidad"
+    osap_api_dir = tmp_path / "osap-api"
+    app_dir.mkdir()
+    osap_api_dir.mkdir()
+    (osap_api_dir / "osap.toml").write_text(
+        '[db]\n'
+        'host = "127.0.0.1"\n'
+        'name = "osap-api"\n'
+        'user = "osap_user"\n'
+        'password = "not-a-real-secret"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(app_dir)
+    for variable in (
+        "AI_PUBLICIDAD_DATABASE_URL",
+        "AI_PUBLICIDAD_OSAP_CONFIG",
+        "OSAP_CONFIG",
+    ):
+        monkeypatch.delenv(variable, raising=False)
+    monkeypatch.setenv("AI_PUBLICIDAD_ENV", "development")
+
+    settings = Settings(_env_file=None)
+    assert make_url(settings.database_url).database == "OSAP_PUBLICIDAD"
