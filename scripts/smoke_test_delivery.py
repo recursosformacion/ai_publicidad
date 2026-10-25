@@ -32,6 +32,7 @@ def main() -> int:
 
     base_url = args.base_url.rstrip("/")
     token = os.getenv("AI_PUBLICIDAD_SERVICE_TOKEN", "").strip()
+    admin_token = os.getenv("AI_PUBLICIDAD_ADMIN_TOKEN", "").strip()
     headers = {"X-OSAP-Service-Token": token} if token else {}
 
     with httpx.Client(base_url=base_url, headers=headers, timeout=20.0) as client:
@@ -53,8 +54,21 @@ def main() -> int:
         suffix = uuid4().hex[:10]
         campaign_id: int | None = None
 
-        def call(method: str, path: str, payload: dict | None = None) -> dict:
-            response = client.request(method, path, json=payload)
+        def call(
+            method: str,
+            path: str,
+            payload: dict | None = None,
+            *,
+            admin: bool = False,
+        ) -> dict:
+            request_headers = (
+                {"X-OSAP-Admin-Token": admin_token}
+                if admin and admin_token
+                else None
+            )
+            response = client.request(
+                method, path, json=payload, headers=request_headers
+            )
             if not response.is_success:
                 raise RuntimeError(
                     f"{method} {path} respondió {response.status_code}: {response.text}"
@@ -99,10 +113,10 @@ def main() -> int:
         }
 
         try:
-            campaign = call("POST", "/api/v1/admin/campaigns", campaign_payload("active"))
+            campaign = call("POST", "/api/v1/admin/campaigns", campaign_payload("active"), admin=True)
             campaign_id = int(campaign["id"])
             creative_payload["campaign_id"] = campaign_id
-            creative = call("POST", "/api/v1/admin/creatives", creative_payload)
+            creative = call("POST", "/api/v1/admin/creatives", creative_payload, admin=True)
             call(
                 "POST",
                 "/api/v1/admin/targeting-rules",
@@ -112,6 +126,7 @@ def main() -> int:
                     "rule_value": application_code,
                     "effect": "include",
                 },
+                admin=True,
             )
 
             commercial = call("POST", "/api/v1/ads/serve", serve_payload)
@@ -139,7 +154,7 @@ def main() -> int:
                     f"primera={first_impression!r}, repetida={second_impression!r}"
                 )
             persisted_commercial = call(
-                "GET", f"/api/v1/admin/deliveries?campaign_id={campaign_id}"
+                "GET", f"/api/v1/admin/deliveries?campaign_id={campaign_id}", admin=True
             )
             if not any(
                 row.get("creative_id") == commercial["ad_id"]
@@ -150,7 +165,7 @@ def main() -> int:
             print("IMPRESIÓN E HISTÓRICO OK: primera confirmación contada; repetición ignorada.")
 
             # Pause via the CRUD API; the next identical request must use an OSAP house ad.
-            call("PUT", f"/api/v1/admin/campaigns/{campaign_id}", campaign_payload("paused"))
+            call("PUT", f"/api/v1/admin/campaigns/{campaign_id}", campaign_payload("paused"), admin=True)
             fallback = call("POST", "/api/v1/ads/serve", serve_payload)
             if fallback.get("kind") != "house" or fallback.get("is_house_ad") is not True:
                 raise RuntimeError(
@@ -160,7 +175,7 @@ def main() -> int:
                     "Comprueba que exista una campaña propia activa con una creatividad compatible."
                 )
             persisted_house = call(
-                "GET", f"/api/v1/admin/deliveries?creative_id={fallback['ad_id']}"
+                "GET", f"/api/v1/admin/deliveries?creative_id={fallback['ad_id']}", admin=True
             )
             if not persisted_house:
                 raise RuntimeError("La entrega del anuncio propio no aparece en el histórico.")
@@ -184,6 +199,7 @@ def main() -> int:
                         "PUT",
                         f"/api/v1/admin/campaigns/{campaign_id}",
                         campaign_payload("paused"),
+                        admin=True,
                     )
                 except Exception as exc:  # preserve the original failure for diagnostics
                     print(
