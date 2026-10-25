@@ -113,6 +113,30 @@ def main() -> int:
                 f"campaign_id={campaign_id}, ad_id={commercial['ad_id']}, kind=commercial"
             )
 
+            # Confirm the first impression exactly once and verify the delivery was persisted.
+            impression_request = {"impression_id": commercial["impression_id"]}
+            first_impression = call(
+                "POST", "/api/v1/events/impression", impression_request
+            )
+            second_impression = call(
+                "POST", "/api/v1/events/impression", impression_request
+            )
+            if first_impression.get("counted") is not True or second_impression.get("counted") is not False:
+                raise RuntimeError(
+                    "La confirmación de impresión no es idempotente: "
+                    f"primera={first_impression!r}, repetida={second_impression!r}"
+                )
+            persisted_commercial = call(
+                "GET", f"/api/v1/admin/deliveries?campaign_id={campaign_id}"
+            )
+            if not any(
+                row.get("creative_id") == commercial["ad_id"]
+                and row.get("impression_confirmed") is True
+                for row in persisted_commercial
+            ):
+                raise RuntimeError("La entrega comercial no aparece confirmada en el histórico.")
+            print("IMPRESIÓN E HISTÓRICO OK: primera confirmación contada; repetición ignorada.")
+
             # Pause via the CRUD API; the next identical request must use an OSAP house ad.
             call("PUT", f"/api/v1/admin/campaigns/{campaign_id}", campaign_payload("paused"))
             fallback = call("POST", "/api/v1/ads/serve", serve_payload)
@@ -123,6 +147,11 @@ def main() -> int:
                     f"is_house_ad={fallback.get('is_house_ad')!r}. "
                     "Comprueba que exista una campaña propia activa con una creatividad compatible."
                 )
+            persisted_house = call(
+                "GET", f"/api/v1/admin/deliveries?creative_id={fallback['ad_id']}"
+            )
+            if not persisted_house:
+                raise RuntimeError("La entrega del anuncio propio no aparece en el histórico.")
             print(
                 "FALLBACK PROPIO OK: "
                 f"ad_id={fallback['ad_id']}, kind=house, is_house_ad=true"
