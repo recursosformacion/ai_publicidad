@@ -247,7 +247,7 @@ Se usarán claves foráneas, índices para las búsquedas de selección y fechas
 
 ### Arranque local del prototipo
 
-El `.env.example` selecciona SQLite para que el arranque local no escriba accidentalmente en MySQL. Para usar la base de esta aplicación, crea su propio `osap.toml` desde `osap.toml.example`, copia los parámetros de conexión que corresponda reutilizar y fija `name = "OSAP_PUBLICIDAD"`. Deja vacía `AI_PUBLICIDAD_DATABASE_URL` para que lea ese fichero. La cuenta deberá tener permisos sobre ese esquema.
+El arranque siguiente es para desarrollo local con SQLite (valor predeterminado de `.env.example`) y no utiliza MySQL. Para usar la base MySQL de esta aplicación, crea su propio `osap.toml` desde `osap.toml.example`, copia los parámetros de conexión que corresponda reutilizar y fija `name = "OSAP_PUBLICIDAD"`. Deja vacía `AI_PUBLICIDAD_DATABASE_URL` para que lea ese fichero y sigue el procedimiento de la sección 9 antes de aplicar migraciones. La cuenta deberá tener permisos sobre ese esquema. El script `seed_house_ads.py` solo admite SQLite local.
 
 ```bash
 python -m venv .venv
