@@ -298,8 +298,8 @@ En PowerShell, sustituye `cp .env.example .env` por `Copy-Item .env.example .env
 - Ejecutar `scripts/seed_house_ads.py --apply` en la base correcta si todavía no se ha cargado la campaña y creatividad propias iniciales.
 - Revisar la idempotencia bajo peticiones concurrentes y endurecer autenticación/limitación de uso.
 - Validar la taxonomía con el código real de `osap-app`.
-- Construir una pantalla web de administración si se necesita gestión visual; actualmente el CRUD implementado es la API REST.
 - Añadir las entidades comerciales aún no modeladas (clientes/anunciantes, espacios, contratos/pedidos) y después sus informes y políticas de retención.
+- Implementar autenticación y autorización de administración antes de publicar el panel fuera de una red de confianza.
 
 ### Fase 2 — API funcional
 - Entrega de anuncios.
