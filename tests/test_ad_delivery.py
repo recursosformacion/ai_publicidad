@@ -63,3 +63,37 @@ def test_click_redirect_uses_database_destination_not_request_url() -> None:
     response = client.get(payload["click_url"].replace("http://127.0.0.1:8305", ""), follow_redirects=False)
     assert response.status_code == 302
     assert response.headers["location"] == "https://example.org/ad"
+
+
+def test_initial_house_seed_is_idempotent() -> None:
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from scripts.seed_house_ads import CAMPAIGN_NAME, CREATIVE_TITLE, seed_house_ads
+
+    test_engine = create_engine("sqlite://")
+    try:
+        Base.metadata.create_all(bind=test_engine)
+        with Session(test_engine) as db:
+            assert seed_house_ads(db) is True
+            db.commit()
+
+        with Session(test_engine) as db:
+            campaign = db.query(Campaign).filter(Campaign.name == CAMPAIGN_NAME).one()
+            creative = (
+                db.query(Creative)
+                .filter(Creative.campaign_id == campaign.id, Creative.title == CREATIVE_TITLE)
+                .one()
+            )
+            assert campaign.is_house_ad is True
+            assert campaign.status == "active"
+            assert creative.status == "approved"
+            assert creative.language == "es"
+            assert creative.format == "responsive"
+            assert creative.destination_url == "https://openmusicrepository.com/"
+            assert seed_house_ads(db) is False
+            db.commit()
+            assert db.query(Campaign).count() == 1
+            assert db.query(Creative).count() == 1
+    finally:
+        test_engine.dispose()
