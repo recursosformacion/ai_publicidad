@@ -73,6 +73,7 @@ def main() -> int:
                 "is_house_ad": False,
             }
 
+        application_code = f"smoke_test_{suffix}"
         creative_payload: dict = {
             "campaign_id": 0,
             "title": f"SMOKE TEST {suffix}",
@@ -85,7 +86,8 @@ def main() -> int:
             "status": "approved",
         }
         serve_payload: dict = {
-            "application": "osap",
+            # Keep the temporary ad out of normal OSAP traffic.
+            "application": application_code,
             "page": {
                 "type": "work_detail",
                 "entity_type": "work",
@@ -101,6 +103,16 @@ def main() -> int:
             campaign_id = int(campaign["id"])
             creative_payload["campaign_id"] = campaign_id
             creative = call("POST", "/api/v1/admin/creatives", creative_payload)
+            call(
+                "POST",
+                "/api/v1/admin/targeting-rules",
+                {
+                    "creative_id": creative["id"],
+                    "rule_type": "application",
+                    "rule_value": application_code,
+                    "effect": "include",
+                },
+            )
 
             commercial = call("POST", "/api/v1/ads/serve", serve_payload)
             if commercial.get("kind") != "commercial" or commercial.get("ad_id") != creative["id"]:
