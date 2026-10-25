@@ -181,7 +181,7 @@ El token identifica una entrega válida. El servidor registra el clic y obtiene 
 
 ### API de administración implementada
 
-Las siguientes rutas están disponibles bajo `/api/v1/admin` y requieren la credencial de servicio en producción (cabecera `X-OSAP-Service-Token`). La interfaz administrativa web puede construirse sobre este contrato; el CRUD aquí es la API, no todavía una pantalla de gestión.
+Las siguientes rutas están disponibles bajo `/api/v1/admin` y requieren una credencial administrativa distinta en producción: `AI_PUBLICIDAD_ADMIN_TOKEN`, enviada en la cabecera `X-OSAP-Admin-Token`. La clave `AI_PUBLICIDAD_SERVICE_TOKEN` que OSAP utiliza para pedir anuncios no concede acceso al CRUD. La interfaz administrativa web puede construirse sobre este contrato; el CRUD aquí es la API, no todavía una pantalla de gestión.
 
 - **Campañas:** `GET/POST /campaigns`, `GET/PUT/DELETE /campaigns/{id}`.
 - **Creatividades:** `GET/POST /creatives`, `GET/PUT/DELETE /creatives/{id}`.
@@ -227,7 +227,7 @@ Se usan claves foráneas e índices en las tablas existentes. Las entregas y los
   ```
   Antes de la última orden, comprueba que el destino mostrado es exactamente `OSAP_PUBLICIDAD`. La migración bloquea conexiones MySQL a cualquier otra base.
 - En desarrollo, `.env.example` mantiene SQLite como opción segura predeterminada. La API no crea tablas automáticamente sobre MySQL; el esquema se gestiona mediante Alembic.
-- Producción requiere `AI_PUBLICIDAD_SERVICE_TOKEN`, `AI_PUBLICIDAD_PUBLIC_BASE_URL` con HTTPS y una conexión que termine en `OSAP_PUBLICIDAD`.
+- Producción requiere `AI_PUBLICIDAD_SERVICE_TOKEN` para las operaciones de entrega, una clave administrativa independiente `AI_PUBLICIDAD_ADMIN_TOKEN`, `AI_PUBLICIDAD_PUBLIC_BASE_URL` con HTTPS y una conexión que termine en `OSAP_PUBLICIDAD`.
 
 ## 10. Prueba HTTP real de entrega y fallback
 
@@ -271,7 +271,7 @@ Si trabajas desde cero, instala también las dependencias de desarrollo (`python
 - CRUD REST autenticado para campañas, creatividades y reglas de segmentación; consultas paginadas de entregas y eventos.
 - Pruebas de integración HTTP usando una SQLite en memoria aislada, sin borrar ni escribir en la base configurada de OSAP.
 - Script de prueba real `scripts/smoke_test_delivery.py`, protegido tras `--apply`, para comprobar el endpoint HTTP contra el servicio y su base configurada.
-- Pruebas de entrega comercial, fallback propio, idempotencia de impresiones, redirección segura, CRUD y autenticación administrativa.
+- Pruebas de entrega comercial, fallback propio, idempotencia de impresiones, redirección segura, CRUD, separación de credenciales y autenticación administrativa.
 
 ### Arranque local del prototipo
 
@@ -322,7 +322,7 @@ En PowerShell, sustituye `cp .env.example .env` por `Copy-Item .env.example .env
 - Se pueden dirigir campañas a tipos de página y a entidades concretas.
 - Una impresión repetida con el mismo identificador no se cuenta dos veces.
 - El clic se registra y redirige únicamente al destino autorizado del anuncio.
-- La clave del cliente no permite gestionar campañas ni leer datos de otros clientes.
+- La clave de entrega de OSAP no permite gestionar campañas: el CRUD requiere la credencial administrativa independiente.
 - Las pruebas se ejecutan con SQLite y la aplicación funciona con MySQL en producción.
 - No hay credenciales reales en Git y un fallo de `ai_publicidad` no debe impedir que OSAP muestre su contenido principal.
 
