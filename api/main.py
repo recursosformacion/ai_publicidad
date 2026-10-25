@@ -26,8 +26,9 @@ app.include_router(clicks_router)
 
 @app.on_event("startup")
 def initialize_development_schema() -> None:
-    """Create a local prototype schema only; production must use migrations."""
-    if get_settings().env != "production":
+    """Auto-create schema only for local SQLite; MySQL schemas always use migrations."""
+    settings = get_settings()
+    if settings.env != "production" and settings.database_url and settings.database_url.startswith("sqlite"):
         Base.metadata.create_all(bind=engine)
 
 
