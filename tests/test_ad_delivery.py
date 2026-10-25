@@ -257,3 +257,21 @@ def test_initial_house_seed_is_idempotent():
             assert db.query(Creative).count() == 1
     finally:
         test_engine.dispose()
+
+
+def test_admin_requires_service_token_in_production(client, monkeypatch):
+    from types import SimpleNamespace
+
+    from application.security import get_settings as security_get_settings
+
+    monkeypatch.setattr(
+        "application.security.get_settings",
+        lambda: SimpleNamespace(env="production", service_token="test-secret"),
+    )
+    missing_token = client.get("/api/v1/admin/campaigns")
+    assert missing_token.status_code == 401
+    valid_token = client.get(
+        "/api/v1/admin/campaigns",
+        headers={"X-OSAP-Service-Token": "test-secret"},
+    )
+    assert valid_token.status_code == 200
