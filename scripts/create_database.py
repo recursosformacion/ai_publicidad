@@ -6,11 +6,20 @@ privileges, creates tables, or reads/writes the existing osap-api schema.
 
 import argparse
 import os
+import sys
+from pathlib import Path
 
+# Running "python scripts/create_database.py" puts scripts/ (not the repository
+# root) first on sys.path. Add the root so infrastructure.config imports work
+# without requiring the project to have been installed as a package.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
-from dotenv import load_dotenv
 
 from infrastructure.config import (
     DATABASE_NAME,
