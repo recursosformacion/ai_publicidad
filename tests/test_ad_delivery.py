@@ -262,8 +262,6 @@ def test_initial_house_seed_is_idempotent():
 def test_admin_requires_service_token_in_production(client, monkeypatch):
     from types import SimpleNamespace
 
-    from application.security import get_settings as security_get_settings
-
     monkeypatch.setattr(
         "application.security.get_settings",
         lambda: SimpleNamespace(env="production", service_token="test-secret"),
