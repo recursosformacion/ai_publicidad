@@ -206,7 +206,15 @@ Se usarán claves foráneas, índices para las búsquedas de selección y fechas
 - **Creación:** `python scripts/create_database.py` comprueba la configuración sin modificar el servidor; `python scripts/create_database.py --apply` intenta crear únicamente `OSAP_PUBLICIDAD` con codificación `utf8mb4`, leyendo la conexión de `osap.toml`. También está disponible `infrastructure/db/create_database.sql` para ejecución manual por una cuenta MySQL/MariaDB autorizada. Ninguno de estos procedimientos crea usuarios ni contraseñas.
 - **Permisos:** la cuenta que aparece en el `osap.toml` podría tener permisos únicamente sobre `osap-api.*`. Crear la nueva base no concede acceso automáticamente. Antes de conectar, un administrador debe conceder a esa cuenta los permisos mínimos sobre `OSAP_PUBLICIDAD.*`, o configurar un usuario de base de datos específico para este servicio. El servicio no intenta ampliar permisos.
 - Una URL explícita `AI_PUBLICIDAD_DATABASE_URL` tiene precedencia sobre `osap.toml`. Ejemplo de formato (valores ficticios, no copiar secretos aquí): `mysql+pymysql://USUARIO:CONTRASEÑA@SERVIDOR:3306/OSAP_PUBLICIDAD?charset=utf8mb4`.
-- Tras crear la base y confirmar permisos, inicializar el esquema con `alembic upgrade head`. Las tablas MySQL se gestionan con migraciones: la API no crea tablas automáticamente cuando se conecta a MySQL, ni siquiera en modo desarrollo. El auto-esquema queda reservado al SQLite local.
+- Tras crear la base y confirmar permisos, inicializar el esquema con Alembic. En PowerShell, desde `D:\\Proyectos\\AI_OSAP\\ai_publicidad`, se puede ejecutar:
+  ```powershell
+  $env:AI_PUBLICIDAD_OSAP_CONFIG = "D:\\Proyectos\\AI_OSAP\\osap-api\\osap.toml"
+  $env:AI_PUBLICIDAD_DATABASE_URL = ""
+  python -c "from infrastructure.config import get_settings; from sqlalchemy.engine import make_url; u=make_url(get_settings().database_url); print(f'Destino: {u.host}:{u.port}/{u.database}; usuario={u.username}')"
+  alembic upgrade head
+  ```
+  Antes de la última orden, comprobar que la línea de destino muestra exactamente `OSAP_PUBLICIDAD`. El entorno vacío sobrescribe una posible URL SQLite del `.env` para esta consola. La migración tiene una protección adicional que rechaza cualquier base MySQL distinta de `OSAP_PUBLICIDAD`.
+- La API no crea tablas automáticamente cuando se conecta a MySQL, ni siquiera en modo desarrollo. El auto-esquema queda reservado al SQLite local.
 - Producción requiere `AI_PUBLICIDAD_SERVICE_TOKEN`, `AI_PUBLICIDAD_PUBLIC_BASE_URL` con HTTPS y una conexión MySQL/MariaDB que termine en `OSAP_PUBLICIDAD`; la configuración falla al arrancar si estas condiciones no se cumplen.
 - Variables de configuración documentadas en `.env.example`: `AI_PUBLICIDAD_DATABASE_URL` (opcional), `OSAP_CONFIG` o `AI_PUBLICIDAD_OSAP_CONFIG`, `AI_PUBLICIDAD_ENV`, `AI_PUBLICIDAD_PUBLIC_BASE_URL` y `AI_PUBLICIDAD_SERVICE_TOKEN`.
 
