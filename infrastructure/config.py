@@ -1,7 +1,8 @@
 """Configuration for the advertising service.
 
-The service can reuse the connection parameters from OSAP's private osap.toml,
-but always targets its own OSAP_PUBLICIDAD schema. Secrets are never committed.
+The service owns a private osap.toml. Connection values can be copied from osap-api's
+configuration, but this service uses its independent OSAP_PUBLICIDAD schema.
+Secrets are never committed.
 """
 
 from functools import lru_cache
@@ -18,22 +19,21 @@ DATABASE_NAME = "OSAP_PUBLICIDAD"
 
 
 def locate_osap_config(explicit_path: str | None = None) -> Path | None:
-    """Locate OSAP's ignored osap.toml without requiring it to be copied into this repo."""
+    """Locate this service's private osap.toml; never fall back to osap-api's config."""
     if explicit_path:
         path = Path(explicit_path)
         if not path.is_file():
             raise ValueError("El fichero indicado por OSAP_CONFIG no existe o no es accesible.")
         return path
 
-    # Typical local layout: D:/Proyectos/AI_OSAP/{ai_publicidad,osap-api}.
-    for candidate in (Path("osap.toml"), Path("../osap-api/osap.toml")):
-        if candidate.is_file():
-            return candidate
-    return None
+    # Each service owns its config. The current working directory should be this
+    # repository root; no credentials are borrowed from sibling application folders.
+    candidate = Path("osap.toml")
+    return candidate if candidate.is_file() else None
 
 
 def database_url_from_osap_toml(path: str | Path) -> str | None:
-    """Build a URL for OSAP_PUBLICIDAD from [db] in osap.toml, without exposing secrets."""
+    """Build a URL for OSAP_PUBLICIDAD from this service's private [db] settings."""
     config_path = Path(path)
     if not config_path.is_file():
         return None
@@ -82,7 +82,7 @@ class Settings(BaseSettings):
     )
 
     env: Literal["development", "test", "production"] = "development"
-    # Explicit URL wins. Otherwise, try OSAP_CONFIG/[db]; local development falls back to SQLite.
+    # Explicit URL wins. Otherwise, read this service's OSAP_CONFIG/[db]; local development falls back to SQLite.
     database_url: str | None = None
     osap_config_path: str | None = Field(
         default=None,
@@ -105,8 +105,8 @@ class Settings(BaseSettings):
                 self.database_url = resolved_url
             elif self.env == "production":
                 raise ValueError(
-                    "En producción configure AI_PUBLICIDAD_DATABASE_URL o indique "
-                    "OSAP_CONFIG hacia el osap.toml privado de osap-api."
+                    "En producción configure AI_PUBLICIDAD_DATABASE_URL o cree el osap.toml "
+                    "privado de ai_publicidad con su conexión a OSAP_PUBLICIDAD."
                 )
             else:
                 self.database_url = "sqlite:///./ai_publicidad.sqlite3"
