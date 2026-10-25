@@ -1,4 +1,4 @@
-""""Configuration for the advertising service.
+"""Configuration for the advertising service.
 
 The service can reuse the connection parameters from OSAP's private osap.toml,
 but always targets its own OSAP_PUBLICIDAD schema. Secrets are never committed.
