@@ -10,6 +10,7 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
+from dotenv import load_dotenv
 
 from infrastructure.config import (
     DATABASE_NAME,
@@ -19,9 +20,11 @@ from infrastructure.config import (
 
 
 def get_connection_url() -> str:
-    """Get an explicit URL or reuse the DB connection from the private osap.toml."""
+    """Get a MySQL URL, preferring explicit non-SQLite settings or OSAP's osap.toml."""
+    load_dotenv()
     explicit_url = os.environ.get("AI_PUBLICIDAD_DATABASE_URL", "").strip()
-    if explicit_url:
+    # The .env.example SQLite URL is for local app development, not for DB provisioning.
+    if explicit_url and not explicit_url.startswith("sqlite"):
         return explicit_url
 
     config_path = locate_osap_config(
