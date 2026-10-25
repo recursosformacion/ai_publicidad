@@ -18,7 +18,7 @@ from sqlalchemy.pool import StaticPool
 os.environ["AI_PUBLICIDAD_ENV"] = "test"
 os.environ["AI_PUBLICIDAD_DATABASE_URL"] = "sqlite://"
 
-from api.main import app
+from api.main import app  # noqa: E402  # config environment must be set before app import
 from domain.models import Base
 from infrastructure.database import get_db
 
