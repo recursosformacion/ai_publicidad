@@ -28,3 +28,5 @@ jobs:
         run: pytest -q
       - name: Check database provisioning command starts correctly
         run: python scripts/create_database.py --help
+      - name: Check house-ad seed command starts correctly
+        run: python scripts/seed_house_ads.py --help
