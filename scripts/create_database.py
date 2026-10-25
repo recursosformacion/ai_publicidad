@@ -1,4 +1,4 @@
-"""Create the OSAP_PUBLICIDAD schema using the private OSAP DB connection.
+"""Create the OSAP_PUBLICIDAD schema using ai_publicidad's own private osap.toml.
 
 This command is explicit and requires --apply. It never creates users, grants
 privileges, creates tables, or reads/writes the existing osap-api schema.
@@ -29,7 +29,7 @@ from infrastructure.config import (
 
 
 def get_connection_url() -> str:
-    """Get a MySQL URL, preferring explicit non-SQLite settings or OSAP's osap.toml."""
+    """Get a MySQL URL, preferring an explicit URL or this service's own osap.toml."""
     load_dotenv()
     explicit_url = os.environ.get("AI_PUBLICIDAD_DATABASE_URL", "").strip()
     # The .env.example SQLite URL is for local app development, not for DB provisioning.
@@ -41,7 +41,8 @@ def get_connection_url() -> str:
     )
     if config_path is None:
         raise SystemExit(
-            "No se encuentra osap.toml. Define OSAP_CONFIG o AI_PUBLICIDAD_OSAP_CONFIG."
+            "No se encuentra el osap.toml propio de ai_publicidad. Crea uno a partir de "
+            "osap.toml.example o define AI_PUBLICIDAD_OSAP_CONFIG."
         )
 
     url = database_url_from_osap_toml(config_path)
