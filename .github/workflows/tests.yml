@@ -26,3 +26,5 @@ jobs:
         run: python -m pip install -e ".[dev]"
       - name: Run automated tests
         run: pytest -q
+      - name: Check database provisioning command starts correctly
+        run: python scripts/create_database.py --help
