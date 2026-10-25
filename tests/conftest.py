@@ -48,7 +48,7 @@ def client(test_engine, monkeypatch):
     # context; no request is made against the configured OSAP database.
     monkeypatch.setattr(
         "application.security.get_settings",
-        lambda: SimpleNamespace(env="test", service_token=""),
+        lambda: SimpleNamespace(env="test", service_token="", admin_token=""),
     )
     app.dependency_overrides[get_db] = override_get_db
     test_client = TestClient(app)
