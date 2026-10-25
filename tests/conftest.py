@@ -4,12 +4,19 @@ These tests must never truncate or write to the database configured for a runnin
 OSAP environment. Every test gets a private in-memory SQLite engine.
 """
 
+import os
+from types import SimpleNamespace
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
-from types import SimpleNamespace
+
+# Make even module-level application initialization use a throwaway database.
+# Individual tests then override get_db with their own in-memory engine.
+os.environ["AI_PUBLICIDAD_ENV"] = "test"
+os.environ["AI_PUBLICIDAD_DATABASE_URL"] = "sqlite://"
 
 from api.main import app
 from domain.models import Base
