@@ -200,23 +200,27 @@ Se usarán claves foráneas, índices para las búsquedas de selección y fechas
 
 ## 9. Base de datos y configuración
 
-- **Nombre de la base de datos de publicidad:** `OSAP_PUBLICIDAD`; no se usa ni se modifica la base operativa `osap-api`.
-- **Reutilización de `osap.toml`:** si no se define `AI_PUBLICIDAD_DATABASE_URL`, el servicio lee la sección `[db]` del `osap.toml` indicado por `OSAP_CONFIG` (o `AI_PUBLICIDAD_OSAP_CONFIG`). Si no se indica ruta, busca `./osap.toml`. Reutiliza host, puerto, usuario y contraseña, pero reemplaza siempre el nombre de la base por `OSAP_PUBLICIDAD`. Sin una ruta explícita, busca primero `./osap.toml` y después `../osap-api/osap.toml`, disposición usada en el desarrollo local.
-- No se debe copiar el fichero real `osap.toml` a Git ni introducir sus credenciales en este repositorio. Para desarrollo local sin ese fichero se utiliza SQLite.
-- **Creación:** `python scripts/create_database.py` comprueba la configuración sin modificar el servidor; `python scripts/create_database.py --apply` intenta crear únicamente `OSAP_PUBLICIDAD` con codificación `utf8mb4`, leyendo la conexión de `osap.toml`. También está disponible `infrastructure/db/create_database.sql` para ejecución manual por una cuenta MySQL/MariaDB autorizada. Ninguno de estos procedimientos crea usuarios ni contraseñas.
-- **Permisos:** la cuenta que aparece en el `osap.toml` podría tener permisos únicamente sobre `osap-api.*`. Crear la nueva base no concede acceso automáticamente. Antes de conectar, un administrador debe conceder a esa cuenta los permisos mínimos sobre `OSAP_PUBLICIDAD.*`, o configurar un usuario de base de datos específico para este servicio. El servicio no intenta ampliar permisos.
-- Una URL explícita `AI_PUBLICIDAD_DATABASE_URL` tiene precedencia sobre `osap.toml`. Ejemplo de formato (valores ficticios, no copiar secretos aquí): `mysql+pymysql://USUARIO:CONTRASEÑA@SERVIDOR:3306/OSAP_PUBLICIDAD?charset=utf8mb4`.
-- Tras crear la base y confirmar permisos, inicializar el esquema con Alembic. En PowerShell, desde `D:\\Proyectos\\AI_OSAP\\ai_publicidad`, se puede ejecutar:
+- **Base de datos propia:** `OSAP_PUBLICIDAD`. `ai_publicidad` es una aplicación independiente y no utiliza la base operativa `osap-api`.
+- **Configuración propia:** el repositorio incluye `osap.toml.example`. En el directorio raíz, crea tu configuración privada:
   ```powershell
-  $env:AI_PUBLICIDAD_OSAP_CONFIG = "D:\\Proyectos\\AI_OSAP\\osap-api\\osap.toml"
+  Copy-Item .\\osap.toml.example .\\osap.toml
+  notepad .\\osap.toml
+  ```
+  Copia desde el `osap-api\\osap.toml` existente únicamente los parámetros de conexión que vayas a reutilizar: `host`, `port`, `user` y `password`. En el fichero de `ai_publicidad`, configura `name = "OSAP_PUBLICIDAD"`. No copies el nombre de base `osap-api`. El fichero real `osap.toml` está excluido de Git.
+- El servicio lee primero una URL explícita `AI_PUBLICIDAD_DATABASE_URL`; si está vacía, utiliza el `osap.toml` propio del directorio actual o la ruta privada indicada por `AI_PUBLICIDAD_OSAP_CONFIG` (también admite `OSAP_CONFIG`). Ya no busca ni toma automáticamente la configuración del directorio hermano `osap-api`.
+- **Permisos MySQL:** copiar usuario y contraseña no concede acceso a una base nueva. Si la cuenta copiada no tiene permisos sobre `OSAP_PUBLICIDAD.*`, un administrador tendrá que conceder los permisos mínimos o configurar una cuenta específica. La aplicación no cambia permisos ni usuarios.
+- La base vacía ya existente no necesita crearse de nuevo. Si aún se necesitara crear en otro entorno, `python scripts/create_database.py --apply` crea solo la base vacía, usando esta configuración propia; no crea tablas, usuarios ni permisos.
+- **Inicialización del esquema:** con `OSAP_PUBLICIDAD` creada y con permisos concedidos, ejecuta en PowerShell desde `D:\\Proyectos\\AI_OSAP\\ai_publicidad`:
+  ```powershell
+  Remove-Item Env:AI_PUBLICIDAD_OSAP_CONFIG -ErrorAction SilentlyContinue
+  Remove-Item Env:OSAP_CONFIG -ErrorAction SilentlyContinue
   $env:AI_PUBLICIDAD_DATABASE_URL = ""
   python -c "from infrastructure.config import get_settings; from sqlalchemy.engine import make_url; u=make_url(get_settings().database_url); print(f'Destino: {u.host}:{u.port}/{u.database}; usuario={u.username}')"
-  alembic upgrade head
+  python -m alembic upgrade head
   ```
-  Antes de la última orden, comprobar que la línea de destino muestra exactamente `OSAP_PUBLICIDAD`. El entorno vacío sobrescribe una posible URL SQLite del `.env` para esta consola. La migración tiene una protección adicional que rechaza cualquier base MySQL distinta de `OSAP_PUBLICIDAD`.
-- La API no crea tablas automáticamente cuando se conecta a MySQL, ni siquiera en modo desarrollo. El auto-esquema queda reservado al SQLite local.
-- Producción requiere `AI_PUBLICIDAD_SERVICE_TOKEN`, `AI_PUBLICIDAD_PUBLIC_BASE_URL` con HTTPS y una conexión MySQL/MariaDB que termine en `OSAP_PUBLICIDAD`; la configuración falla al arrancar si estas condiciones no se cumplen.
-- Variables de configuración documentadas en `.env.example`: `AI_PUBLICIDAD_DATABASE_URL` (opcional), `OSAP_CONFIG` o `AI_PUBLICIDAD_OSAP_CONFIG`, `AI_PUBLICIDAD_ENV`, `AI_PUBLICIDAD_PUBLIC_BASE_URL` y `AI_PUBLICIDAD_SERVICE_TOKEN`.
+  Antes de la última orden, comprueba que el destino mostrado es exactamente `OSAP_PUBLICIDAD`. La migración bloquea conexiones MySQL a cualquier otra base.
+- En desarrollo, `.env.example` mantiene SQLite como opción segura predeterminada. La API no crea tablas automáticamente sobre MySQL; el esquema se gestiona mediante Alembic.
+- Producción requiere `AI_PUBLICIDAD_SERVICE_TOKEN`, `AI_PUBLICIDAD_PUBLIC_BASE_URL` con HTTPS y una conexión que termine en `OSAP_PUBLICIDAD`.
 
 ## 10. Seguridad, privacidad y fiabilidad
 
