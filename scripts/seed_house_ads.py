@@ -34,7 +34,7 @@ def main() -> None:
                 body="Explora el catálogo y encuentra recursos para tus obras musicales.",
                 image_url=None,
                 alt_text=None,
-                format="text",
+                format="responsive",
                 language="es",
                 destination_url="https://openmusicrepository.com/",
                 status="approved",
