@@ -32,6 +32,9 @@ ai-publicidad-api = "api.main:run"
 [tool.hatch.build.targets.wheel]
 packages = ["api", "domain", "application", "infrastructure"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"api/static/admin.html" = "api/static/admin.html"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
