@@ -27,6 +27,9 @@ def test_admin_panel_is_served_and_contains_navigation_and_crud_controls():
         "Borrar",
         "Editar",
         "Ver",
+        'id="include-archived"',
+        "Mostrar archivados",
+        "archived",
     ):
         assert marker in html
 
