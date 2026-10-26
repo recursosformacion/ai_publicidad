@@ -189,7 +189,7 @@ Las rutas CRUD están disponibles bajo `/api/v1/admin`. La pantalla web está en
 - **Histórico de entregas:** `GET /deliveries` y `GET /deliveries/{id}`, con filtros por campaña o creatividad.
 - **Histórico de eventos:** `GET /events` y `GET /events/{id}`, con filtros por tipo de evento y entrega.
 
-Las tablas de configuración tienen CRUD. `ad_deliveries` y `ad_events` son datos operativos e históricos: se consultan, pero no se editan ni borran desde la administración para no falsear métricas ni romper relaciones. Si una campaña o creatividad ya tiene entregas, se debe pausar en lugar de borrarla. Las reglas de segmentación admiten `application`, `page_type`, `placement`, `language`, `entity_type` y `entity_id`, con efecto `include` o `exclude`.
+Las tablas de configuración tienen CRUD. `ad_deliveries` y `ad_events` son datos operativos e históricos: se consultan, pero no se editan ni borran desde la administración para no falsear métricas ni romper relaciones. Al borrar una creatividad con entregas, se archiva (`status = archived`) y deja de participar en futuras entregas, conservando sus relaciones históricas. Si se borra una campaña con entregas, se archiva también la campaña y todas sus creatividades. Si la campaña no tiene entregas, se elimina físicamente junto con sus creatividades y reglas de segmentación. Las reglas admiten `application`, `page_type`, `placement`, `language`, `entity_type` y `entity_id`, con efecto `include` o `exclude`.
 
 En el panel `/admin`, cada listado muestra los campos principales y ofrece **Ver**. La acción **Ver** abre la misma pantalla de formulario que **Editar**, pero con todos los campos deshabilitados y sin opción de guardar; en las entregas y eventos se utiliza ese mismo formato de solo lectura. En campañas, creatividades y reglas también están **Editar** y **Borrar**, además de **Nuevo**. Los formularios incluyen selectores de campaña/creatividad y el filtro busca dentro del listado actual.
 
@@ -271,6 +271,7 @@ Si trabajas desde cero, instala también las dependencias de desarrollo (`python
 - `GET /r/{token}`: registra el clic y redirige al destino almacenado en la creatividad, nunca a una URL recibida en la petición.
 - Modelos SQLAlchemy y primera migración Alembic; esquema local automático solo en desarrollo/pruebas.
 - CRUD REST para campañas, creatividades y reglas de segmentación; consultas paginadas de entregas y eventos.
+- Borrado seguro: eliminación física de configuración sin histórico y archivado automático cuando hay entregas, manteniendo intactas las estadísticas.
 - Panel web en `/admin` con menú de secciones, listados, filtros, acción **Ver** en formulario de solo lectura, formularios de alta/edición y confirmación de borrado.
 - Pruebas de integración HTTP usando una SQLite en memoria aislada, sin borrar ni escribir en la base configurada de OSAP.
 - Script de prueba real `scripts/smoke_test_delivery.py`, protegido tras `--apply`, para comprobar el endpoint HTTP contra el servicio y su base configurada.
