@@ -8,8 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from application.security import validate_destination
 
 
-CampaignStatus = Literal["draft", "active", "paused", "completed", "cancelled"]
-CreativeStatus = Literal["draft", "approved", "paused", "rejected"]
+CampaignStatus = Literal["draft", "active", "paused", "completed", "cancelled", "archived"]
+CreativeStatus = Literal["draft", "approved", "paused", "rejected", "archived"]
 CreativeFormat = Literal["image", "text", "image_text", "responsive"]
 RuleType = Literal["application", "page_type", "placement", "language", "entity_type", "entity_id"]
 RuleEffect = Literal["include", "exclude"]
