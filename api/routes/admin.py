@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from api.admin_schemas import (
     AdDeliveryRead,
     AdEventRead,
+    AdFormatInput,
+    AdFormatRead,
     CampaignInput,
     CampaignRead,
     CreativeInput,
@@ -15,7 +17,7 @@ from api.admin_schemas import (
     TargetingRuleInput,
     TargetingRuleRead,
 )
-from domain.models import AdDelivery, AdEvent, Campaign, Creative, TargetingRule
+from domain.models import AdDelivery, AdEvent, AdFormat, Campaign, Creative, TargetingRule, creative_ad_formats
 from infrastructure.database import get_db
 
 # Authorization is intentionally deferred to a later phase.
@@ -32,6 +34,100 @@ def _commit_or_conflict(db: Session, message: str) -> None:
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail=message) from exc
+
+
+def _resolve_ad_formats(db: Session, format_ids: list[int]) -> list[AdFormat]:
+    if not format_ids:
+        return []
+    formats = list(db.scalars(select(AdFormat).where(AdFormat.id.in_(format_ids))).all())
+    found_ids = {ad_format.id for ad_format in formats}
+    missing_ids = sorted(set(format_ids) - found_ids)
+    if missing_ids:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No existen estos formatos de anuncio: {missing_ids}",
+        )
+    return formats
+
+
+# Standard ad-format catalogue
+
+@router.get("/ad-formats", response_model=list[AdFormatRead])
+def list_ad_formats(
+    include_inactive: bool = Query(default=False),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=200),
+    db: Session = Depends(get_db),
+) -> list[AdFormat]:
+    query = select(AdFormat)
+    if not include_inactive:
+        query = query.where(AdFormat.is_active.is_(True))
+    query = query.order_by(AdFormat.width, AdFormat.height).offset(offset).limit(limit)
+    return list(db.scalars(query).all())
+
+
+@router.post("/ad-formats", response_model=AdFormatRead, status_code=status.HTTP_201_CREATED)
+def create_ad_format(payload: AdFormatInput, db: Session = Depends(get_db)) -> AdFormat:
+    ad_format = AdFormat(**payload.model_dump())
+    db.add(ad_format)
+    _commit_or_conflict(db, "Ya existe un formato con ese código.")
+    db.refresh(ad_format)
+    return ad_format
+
+
+@router.get("/ad-formats/{format_id}", response_model=AdFormatRead)
+def get_ad_format(format_id: int, db: Session = Depends(get_db)) -> AdFormat:
+    ad_format = db.get(AdFormat, format_id)
+    if ad_format is None:
+        raise _not_found("Formato de anuncio", format_id)
+    return ad_format
+
+
+@router.put("/ad-formats/{format_id}", response_model=AdFormatRead)
+def replace_ad_format(
+    format_id: int, payload: AdFormatInput, db: Session = Depends(get_db)
+) -> AdFormat:
+    ad_format = db.get(AdFormat, format_id)
+    if ad_format is None:
+        raise _not_found("Formato de anuncio", format_id)
+    for key, value in payload.model_dump().items():
+        setattr(ad_format, key, value)
+    _commit_or_conflict(db, "Ya existe otro formato con ese código.")
+    db.refresh(ad_format)
+    return ad_format
+
+
+@router.delete("/ad-formats/{format_id}")
+def delete_ad_format(format_id: int, db: Session = Depends(get_db)) -> dict[str, object]:
+    ad_format = db.get(AdFormat, format_id)
+    if ad_format is None:
+        raise _not_found("Formato de anuncio", format_id)
+
+    creative_count = db.scalar(
+        select(func.count())
+        .select_from(creative_ad_formats)
+        .where(creative_ad_formats.c.ad_format_id == format_id)
+    ) or 0
+    delivery_count = db.scalar(
+        select(func.count())
+        .select_from(AdDelivery)
+        .where(AdDelivery.ad_format_id == format_id)
+    ) or 0
+    if creative_count or delivery_count:
+        ad_format.is_active = False
+        db.commit()
+        return {
+            "deleted": False,
+            "deactivated": True,
+            "message": (
+                "El formato se ha desactivado porque está asociado a anuncios o entregas. "
+                "Se conserva el histórico y no se ofrecerá para nuevas entregas."
+            ),
+        }
+
+    db.delete(ad_format)
+    db.commit()
+    return {"deleted": True}
 
 
 # Campaigns
@@ -148,7 +244,8 @@ def list_creatives(
 def create_creative(payload: CreativeInput, db: Session = Depends(get_db)) -> Creative:
     if db.get(Campaign, payload.campaign_id) is None:
         raise HTTPException(status_code=404, detail=f"Campaña {payload.campaign_id} no existe")
-    creative = Creative(**payload.model_dump())
+    creative = Creative(**payload.model_dump(exclude={"ad_format_ids"}))
+    creative.ad_formats = _resolve_ad_formats(db, payload.ad_format_ids)
     db.add(creative)
     db.commit()
     db.refresh(creative)
@@ -172,8 +269,9 @@ def replace_creative(
         raise _not_found("Creatividad", creative_id)
     if db.get(Campaign, payload.campaign_id) is None:
         raise HTTPException(status_code=404, detail=f"Campaña {payload.campaign_id} no existe")
-    for key, value in payload.model_dump().items():
+    for key, value in payload.model_dump(exclude={"ad_format_ids"}).items():
         setattr(creative, key, value)
+    creative.ad_formats = _resolve_ad_formats(db, payload.ad_format_ids)
     db.commit()
     db.refresh(creative)
     return creative
