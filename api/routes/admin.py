@@ -77,20 +77,47 @@ def replace_campaign(
 
 
 @router.delete("/campaigns/{campaign_id}")
-def delete_campaign(campaign_id: int, db: Session = Depends(get_db)) -> dict[str, bool]:
+def delete_campaign(campaign_id: int, db: Session = Depends(get_db)) -> dict[str, object]:
     campaign = db.get(Campaign, campaign_id)
     if campaign is None:
         raise _not_found("Campaña", campaign_id)
-    if db.scalar(select(func.count()).select_from(Creative).where(Creative.campaign_id == campaign_id)):
-        raise HTTPException(
-            status_code=409,
-            detail="La campaña tiene creatividades; elimínalas primero o pausa la campaña para conservar el histórico.",
+
+    creatives = list(
+        db.scalars(select(Creative).where(Creative.campaign_id == campaign_id)).all()
+    )
+    delivery_count = db.scalar(
+        select(func.count())
+        .select_from(AdDelivery)
+        .where(AdDelivery.campaign_id == campaign_id)
+    ) or 0
+
+    if delivery_count:
+        # Keep the campaign, creatives, and targeting linked to immutable delivery
+        # history, but make every item ineligible for future delivery.
+        campaign.status = "archived"
+        for creative in creatives:
+            creative.status = "archived"
+        db.commit()
+        return {
+            "deleted": False,
+            "archived": True,
+            "message": (
+                "La campaña y sus creatividades se han archivado porque existen entregas "
+                "históricas. Las estadísticas se conservan y los anuncios dejan de entregarse."
+            ),
+        }
+
+    # No deliveries reference the campaign, so its dependent setup can be removed safely.
+    creative_ids = [creative.id for creative in creatives]
+    if creative_ids:
+        db.query(TargetingRule).filter(TargetingRule.creative_id.in_(creative_ids)).delete(
+            synchronize_session=False
         )
-    if db.scalar(select(func.count()).select_from(AdDelivery).where(AdDelivery.campaign_id == campaign_id)):
-        raise HTTPException(status_code=409, detail="La campaña tiene entregas históricas y no se puede borrar.")
+    for creative in creatives:
+        db.delete(creative)
     db.delete(campaign)
     db.commit()
-    return {"deleted": True}
+    return {"deleted": True, "archived": False}
 
 
 # Creatives
@@ -145,19 +172,34 @@ def replace_creative(
 
 
 @router.delete("/creatives/{creative_id}")
-def delete_creative(creative_id: int, db: Session = Depends(get_db)) -> dict[str, bool]:
+def delete_creative(creative_id: int, db: Session = Depends(get_db)) -> dict[str, object]:
     creative = db.get(Creative, creative_id)
     if creative is None:
         raise _not_found("Creatividad", creative_id)
-    if db.scalar(select(func.count()).select_from(AdDelivery).where(AdDelivery.creative_id == creative_id)):
-        raise HTTPException(
-            status_code=409,
-            detail="La creatividad tiene entregas históricas; pausa la creatividad para conservar las estadísticas.",
-        )
+
+    delivery_count = db.scalar(
+        select(func.count())
+        .select_from(AdDelivery)
+        .where(AdDelivery.creative_id == creative_id)
+    ) or 0
+    if delivery_count:
+        # A soft delete preserves historical reporting while immediately excluding
+        # this creative from delivery (the serving endpoint only selects approved rows).
+        creative.status = "archived"
+        db.commit()
+        return {
+            "deleted": False,
+            "archived": True,
+            "message": (
+                "La creatividad se ha archivado porque tiene entregas históricas. "
+                "Las estadísticas se conservan y el anuncio deja de entregarse."
+            ),
+        }
+
     db.query(TargetingRule).filter(TargetingRule.creative_id == creative_id).delete()
     db.delete(creative)
     db.commit()
-    return {"deleted": True}
+    return {"deleted": True, "archived": False}
 
 
 # Targeting rules
