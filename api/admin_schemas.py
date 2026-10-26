@@ -13,6 +13,24 @@ CreativeStatus = Literal["draft", "approved", "paused", "rejected", "archived"]
 CreativeFormat = Literal["image", "text", "image_text", "responsive"]
 RuleType = Literal["application", "page_type", "placement", "language", "entity_type", "entity_id"]
 RuleEffect = Literal["include", "exclude"]
+AdFormatDevice = Literal["desktop", "mobile", "both"]
+AdFormatCategory = Literal["banner", "rectangle", "square", "skyscraper", "video", "other"]
+
+
+class AdFormatInput(BaseModel):
+    code: str = Field(min_length=2, max_length=50, pattern=r"^[a-z0-9][a-z0-9_-]*$")
+    name: str = Field(min_length=2, max_length=120)
+    width: int = Field(gt=0, le=5000)
+    height: int = Field(gt=0, le=5000)
+    device: AdFormatDevice = "both"
+    category: AdFormatCategory = "banner"
+    placement_notes: str | None = Field(default=None, max_length=2000)
+    is_active: bool = True
+
+
+class AdFormatRead(AdFormatInput):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
 
 
 class CampaignInput(BaseModel):
@@ -45,6 +63,16 @@ class CreativeInput(BaseModel):
     language: str = Field(default="es", min_length=2, max_length=12)
     destination_url: str = Field(min_length=1, max_length=2048)
     status: CreativeStatus = "draft"
+    ad_format_ids: list[int] = Field(default_factory=list, max_length=20)
+
+    @field_validator("ad_format_ids")
+    @classmethod
+    def validate_ad_format_ids(cls, values: list[int]) -> list[int]:
+        if any(value <= 0 for value in values):
+            raise ValueError("Los identificadores de formato deben ser positivos")
+        if len(set(values)) != len(values):
+            raise ValueError("No se puede asignar dos veces el mismo formato a un anuncio")
+        return values
 
     @field_validator("destination_url")
     @classmethod
