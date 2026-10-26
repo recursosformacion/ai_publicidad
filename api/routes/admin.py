@@ -38,11 +38,16 @@ def _commit_or_conflict(db: Session, message: str) -> None:
 
 @router.get("/campaigns", response_model=list[CampaignRead])
 def list_campaigns(
+    include_archived: bool = Query(default=False),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=200),
     db: Session = Depends(get_db),
 ) -> list[Campaign]:
-    return list(db.scalars(select(Campaign).order_by(Campaign.id.desc()).offset(offset).limit(limit)).all())
+    query = select(Campaign)
+    if not include_archived:
+        query = query.where(Campaign.status != "archived")
+    query = query.order_by(Campaign.id.desc()).offset(offset).limit(limit)
+    return list(db.scalars(query).all())
 
 
 @router.post("/campaigns", response_model=CampaignRead, status_code=status.HTTP_201_CREATED)
@@ -125,6 +130,7 @@ def delete_campaign(campaign_id: int, db: Session = Depends(get_db)) -> dict[str
 @router.get("/creatives", response_model=list[CreativeRead])
 def list_creatives(
     campaign_id: int | None = Query(default=None, gt=0),
+    include_archived: bool = Query(default=False),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -132,6 +138,8 @@ def list_creatives(
     query = select(Creative)
     if campaign_id is not None:
         query = query.where(Creative.campaign_id == campaign_id)
+    if not include_archived:
+        query = query.where(Creative.status != "archived")
     query = query.order_by(Creative.id.desc()).offset(offset).limit(limit)
     return list(db.scalars(query).all())
 
@@ -207,13 +215,16 @@ def delete_creative(creative_id: int, db: Session = Depends(get_db)) -> dict[str
 @router.get("/targeting-rules", response_model=list[TargetingRuleRead])
 def list_targeting_rules(
     creative_id: int | None = Query(default=None, gt=0),
+    include_archived: bool = Query(default=False),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=200),
     db: Session = Depends(get_db),
 ) -> list[TargetingRule]:
-    query = select(TargetingRule)
+    query = select(TargetingRule).join(Creative, Creative.id == TargetingRule.creative_id)
     if creative_id is not None:
         query = query.where(TargetingRule.creative_id == creative_id)
+    if not include_archived:
+        query = query.where(Creative.status != "archived")
     query = query.order_by(TargetingRule.id.desc()).offset(offset).limit(limit)
     return list(db.scalars(query).all())
 
