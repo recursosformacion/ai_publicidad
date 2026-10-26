@@ -2,8 +2,8 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table, Text, UniqueConstraint
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 def utcnow() -> datetime:
@@ -12,6 +12,36 @@ def utcnow() -> datetime:
 
 class Base(DeclarativeBase):
     pass
+
+
+creative_ad_formats = Table(
+    "creative_ad_formats",
+    Base.metadata,
+    Column("creative_id", Integer, ForeignKey("creatives.id", ondelete="CASCADE"), primary_key=True),
+    Column("ad_format_id", Integer, ForeignKey("ad_formats.id", ondelete="RESTRICT"), primary_key=True),
+)
+
+
+class AdFormat(Base):
+    """Catalog entry for a standardized ad slot size and its placement guidance."""
+
+    __tablename__ = "ad_formats"
+    __table_args__ = (UniqueConstraint("code"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    width: Mapped[int] = mapped_column(Integer, nullable=False)
+    height: Mapped[int] = mapped_column(Integer, nullable=False)
+    device: Mapped[str] = mapped_column(String(20), default="both", nullable=False)
+    category: Mapped[str] = mapped_column(String(30), default="banner", nullable=False)
+    placement_notes: Mapped[str | None] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    creatives: Mapped[list["Creative"]] = relationship(
+        secondary=creative_ad_formats,
+        back_populates="ad_formats",
+    )
 
 
 class Campaign(Base):
@@ -39,6 +69,15 @@ class Creative(Base):
     language: Mapped[str] = mapped_column(String(12), default="es", nullable=False)
     destination_url: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="approved", nullable=False)
+    ad_formats: Mapped[list[AdFormat]] = relationship(
+        secondary=creative_ad_formats,
+        back_populates="creatives",
+        order_by="AdFormat.width, AdFormat.height",
+    )
+
+    @property
+    def ad_format_ids(self) -> list[int]:
+        return [ad_format.id for ad_format in self.ad_formats]
 
 
 class TargetingRule(Base):
