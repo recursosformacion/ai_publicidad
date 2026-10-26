@@ -26,7 +26,6 @@ class AdFormat(Base):
     """Catalog entry for a standardized ad slot size and its placement guidance."""
 
     __tablename__ = "ad_formats"
-    __table_args__ = (UniqueConstraint("code"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
