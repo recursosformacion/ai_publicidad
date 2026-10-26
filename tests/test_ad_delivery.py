@@ -338,3 +338,136 @@ def test_initial_house_seed_is_idempotent():
             assert db.query(Creative).count() == 1
     finally:
         test_engine.dispose()
+
+def test_standard_ad_format_catalog_and_size_specific_delivery(client, test_engine):
+    ad_format_response = client.post(
+        "/api/v1/admin/ad-formats",
+        json={
+            "code": "test_rectangle_300x250",
+            "name": "Rectángulo de prueba 300×250",
+            "width": 300,
+            "height": 250,
+            "device": "both",
+            "category": "rectangle",
+            "placement_notes": "Bloque centrado de prueba.",
+            "is_active": True,
+        },
+    )
+    assert ad_format_response.status_code == 201
+    ad_format = ad_format_response.json()
+    format_id = ad_format["id"]
+
+    commercial_campaign = client.post(
+        "/api/v1/admin/campaigns",
+        json=_campaign_payload("size-specific commercial", priority=100),
+    )
+    campaign_id = commercial_campaign.json()["id"]
+    creative_data = _creative_payload(campaign_id, "Rectangle creative", format="responsive")
+    creative_data["ad_format_ids"] = [format_id]
+    creative_response = client.post("/api/v1/admin/creatives", json=creative_data)
+    assert creative_response.status_code == 201
+    creative_id = creative_response.json()["id"]
+    assert creative_response.json()["ad_format_ids"] == [format_id]
+
+    fallback_campaign = client.post(
+        "/api/v1/admin/campaigns",
+        json=_campaign_payload("generic house fallback", priority=-100, house=True),
+    )
+    fallback_campaign_id = fallback_campaign.json()["id"]
+    fallback_creative = client.post(
+        "/api/v1/admin/creatives",
+        json=_creative_payload(fallback_campaign_id, "Generic house creative", format="responsive"),
+    )
+    fallback_creative_id = fallback_creative.json()["id"]
+
+    rectangle_request = _serve_payload()
+    rectangle_request["placement"] = "sidebar"
+    rectangle_request["format"] = {"type": "text", "width": 300, "height": 250}
+    commercial_delivery = client.post("/api/v1/ads/serve", json=rectangle_request)
+    assert commercial_delivery.status_code == 200
+    commercial_payload = commercial_delivery.json()
+    assert commercial_payload["kind"] == "commercial"
+    assert commercial_payload["ad_id"] == creative_id
+    assert commercial_payload["ad_format_code"] == "test_rectangle_300x250"
+    assert commercial_payload["ad_width"] == 300
+    assert commercial_payload["ad_height"] == 250
+
+    with Session(test_engine) as db:
+        delivery = db.query(AdDelivery).filter_by(token=commercial_payload["impression_id"]).one()
+        assert delivery.ad_format_id == format_id
+
+    # A fixed-size creative must not leak into an incompatible slot.
+    wrong_size_request = dict(rectangle_request)
+    wrong_size_request["format"] = {"type": "text", "width": 728, "height": 90}
+    fallback = client.post("/api/v1/ads/serve", json=wrong_size_request)
+    assert fallback.status_code == 200
+    assert fallback.json()["kind"] == "house"
+    assert fallback.json()["ad_id"] == fallback_creative_id
+    assert fallback.json()["ad_format_code"] is None
+
+
+def test_standard_ad_format_cannot_be_deleted_while_referenced(client):
+    fmt = client.post(
+        "/api/v1/admin/ad-formats",
+        json={
+            "code": "test_square_200x200",
+            "name": "Cuadrado de prueba",
+            "width": 200,
+            "height": 200,
+            "device": "both",
+            "category": "square",
+            "placement_notes": None,
+            "is_active": True,
+        },
+    )
+    assert fmt.status_code == 201
+    format_id = fmt.json()["id"]
+
+    campaign = client.post(
+        "/api/v1/admin/campaigns", json=_campaign_payload("format reference campaign")
+    )
+    campaign_id = campaign.json()["id"]
+    creative_data = _creative_payload(campaign_id, "Format reference creative")
+    creative_data["ad_format_ids"] = [format_id]
+    assert client.post("/api/v1/admin/creatives", json=creative_data).status_code == 201
+
+    deleted = client.delete(f"/api/v1/admin/ad-formats/{format_id}")
+    assert deleted.status_code == 200
+    assert deleted.json()["deleted"] is False
+    assert deleted.json()["deactivated"] is True
+    assert client.get("/api/v1/admin/ad-formats").json() == []
+    inactive = client.get("/api/v1/admin/ad-formats?include_inactive=true").json()
+    assert len(inactive) == 1 and inactive[0]["is_active"] is False
+
+
+def test_seed_omr_campaign_is_idempotent_and_creates_four_ads():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from domain.models import AdFormat, Base
+    from scripts.seed_omr_campaign import CAMPAIGN_NAME, seed_omr_campaign
+
+    test_engine = create_engine("sqlite://")
+    try:
+        Base.metadata.create_all(bind=test_engine)
+        with Session(test_engine) as db:
+            assert seed_omr_campaign(db) is True
+            db.commit()
+
+        with Session(test_engine) as db:
+            campaign = db.query(Campaign).filter_by(name=CAMPAIGN_NAME).one()
+            creatives = db.query(Creative).filter_by(campaign_id=campaign.id).all()
+            formats = db.query(AdFormat).all()
+            assert campaign.is_house_ad is True
+            assert campaign.status == "active"
+            assert len(creatives) == 4
+            assert len(formats) == 5
+            assert sorted(len(creative.ad_formats) for creative in creatives) == [1, 1, 1, 2]
+            assert seed_omr_campaign(db) is False
+            db.commit()
+            assert db.query(Campaign).count() == 1
+            assert db.query(Creative).count() == 4
+            assert db.query(AdFormat).count() == 5
+    finally:
+        test_engine.dispose()
+
