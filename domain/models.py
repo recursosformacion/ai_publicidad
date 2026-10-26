@@ -104,6 +104,9 @@ class AdDelivery(Base):
     entity_id: Mapped[str | None] = mapped_column(String(160))
     placement: Mapped[str] = mapped_column(String(80), nullable=False)
     language: Mapped[str] = mapped_column(String(12), nullable=False)
+    ad_format_id: Mapped[int | None] = mapped_column(
+        ForeignKey("ad_formats.id", ondelete="RESTRICT")
+    )
     delivered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     impression_confirmed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     impression_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
