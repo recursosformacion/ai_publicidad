@@ -191,7 +191,7 @@ Las rutas CRUD están disponibles bajo `/api/v1/admin`. La pantalla web está en
 
 Las tablas de configuración tienen CRUD. `ad_deliveries` y `ad_events` son datos operativos e históricos: se consultan, pero no se editan ni borran desde la administración para no falsear métricas ni romper relaciones. Si una campaña o creatividad ya tiene entregas, se debe pausar en lugar de borrarla. Las reglas de segmentación admiten `application`, `page_type`, `placement`, `language`, `entity_type` y `entity_id`, con efecto `include` o `exclude`.
 
-En el panel `/admin`, cada listado muestra los campos principales y ofrece **Ver**. En campañas, creatividades y reglas también están **Editar** y **Borrar**, además de **Nuevo**. Los formularios usan los campos del modelo y los selectores de campaña/creatividad muestran sus registros asociados. El filtro busca dentro del listado actual.
+En el panel `/admin`, cada listado muestra los campos principales y ofrece **Ver**. La acción **Ver** abre la misma pantalla de formulario que **Editar**, pero con todos los campos deshabilitados y sin opción de guardar; en las entregas y eventos se utiliza ese mismo formato de solo lectura. En campañas, creatividades y reglas también están **Editar** y **Borrar**, además de **Nuevo**. Los formularios incluyen selectores de campaña/creatividad y el filtro busca dentro del listado actual.
 
 ## 8. Modelo de datos inicial
 
@@ -271,7 +271,7 @@ Si trabajas desde cero, instala también las dependencias de desarrollo (`python
 - `GET /r/{token}`: registra el clic y redirige al destino almacenado en la creatividad, nunca a una URL recibida en la petición.
 - Modelos SQLAlchemy y primera migración Alembic; esquema local automático solo en desarrollo/pruebas.
 - CRUD REST para campañas, creatividades y reglas de segmentación; consultas paginadas de entregas y eventos.
-- Panel web en `/admin` con navegación entre listados, filtros, detalle en ventana, formularios de alta/edición y confirmación de borrado.
+- Panel web en `/admin` con menú de secciones, listados, filtros, acción **Ver** en formulario de solo lectura, formularios de alta/edición y confirmación de borrado.
 - Pruebas de integración HTTP usando una SQLite en memoria aislada, sin borrar ni escribir en la base configurada de OSAP.
 - Script de prueba real `scripts/smoke_test_delivery.py`, protegido tras `--apply`, para comprobar el endpoint HTTP contra el servicio y su base configurada.
 - Pruebas de entrega comercial, fallback propio, idempotencia de impresiones, redirección segura, CRUD y carga de la interfaz web.
