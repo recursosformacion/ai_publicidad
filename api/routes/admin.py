@@ -122,7 +122,7 @@ def delete_campaign(campaign_id: int, db: Session = Depends(get_db)) -> dict[str
         db.delete(creative)
     db.delete(campaign)
     db.commit()
-    return {"deleted": True, "archived": False}
+    return {"deleted": True}
 
 
 # Creatives
@@ -207,7 +207,7 @@ def delete_creative(creative_id: int, db: Session = Depends(get_db)) -> dict[str
     db.query(TargetingRule).filter(TargetingRule.creative_id == creative_id).delete()
     db.delete(creative)
     db.commit()
-    return {"deleted": True, "archived": False}
+    return {"deleted": True}
 
 
 # Targeting rules
