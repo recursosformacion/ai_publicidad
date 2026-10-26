@@ -26,6 +26,10 @@ jobs:
         run: python -m pip install -e ".[dev]"
       - name: Run automated tests
         run: pytest -q
+      - name: Check administration panel JavaScript syntax
+        run: |
+          python -c "from pathlib import Path; import re; html=Path('api/static/admin.html').read_text(encoding='utf-8'); match=re.search(r'<script>(.*?)</script>', html, re.S); assert match, 'script block missing'; Path('/tmp/ai_publicidad_admin.js').write_text(match.group(1), encoding='utf-8')"
+          node --check /tmp/ai_publicidad_admin.js
       - name: Check database provisioning command starts correctly
         run: python scripts/create_database.py --help
       - name: Check house-ad seed command starts correctly
