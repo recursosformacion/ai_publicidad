@@ -72,7 +72,9 @@ Formatos iniciales:
 - `image_text`: imagen, título y texto.
 - `responsive`: creatividad adaptable a tamaños previamente autorizados.
 
-Los tamaños admitidos se configurarán por espacio y dispositivo (escritorio, tableta y móvil). La API devolverá dimensiones y formato explícitos. El cliente no debe tener que adivinar cómo representar la creatividad.
+Los tamaños se catalogan en `ad_formats`, separados del tipo de creatividad. El catálogo inicial contiene `728×90` (banner de escritorio), `320×50` (banner móvil), `300×250` (rectángulo), `160×600` (vertical) y `200×200` (cuadrado compacto solicitado para el diseño OSAP). Las notas del catálogo explican el efecto estructural de cada medida: el rectángulo de 300×250 puede centrarse, pero una columna lateral estrecha puede requerir ampliación; el vertical de 160×600 necesita al menos ese ancho y no implica que ya exista reproducción de vídeo.
+
+Un anuncio puede asociarse a varios formatos estándar. El banner institucional de OpenMusicRepository se asocia a los dos tamaños de cabecera: escritorio y móvil. Cuando se solicitan dimensiones, la entrega prioriza un anuncio asignado exactamente a ese tamaño y dispositivo; si no lo hay, puede usar una creatividad genérica compatible como reserva, pero no un anuncio fijo de dimensiones distintas. Los clientes deben enviar `width` y `height` juntos; sin dimensiones, solo se entregan creatividades genéricas no asociadas a tamaños fijos.
 
 ## 5. Selección de anuncios
 
@@ -154,7 +156,8 @@ La respuesta satisfactoria incluirá, como mínimo:
 
 - `ad_id` y un `impression_id` opaco y único.
 - `kind`: `commercial` o `house`.
-- Formato, dimensiones, título/texto y datos del recurso visual.
+- Tipo de creatividad, título/texto y datos del recurso visual.
+- `ad_format_code`, `ad_format_name`, `ad_width` y `ad_height` del tamaño seleccionado, si la solicitud especificó dimensiones.
 - Texto alternativo y etiqueta de publicidad cuando corresponda.
 - `click_url` alojada en `ai_publicidad`, no la URL final expuesta directamente.
 - Caducidad o versión de la entrega si resulta necesaria.
@@ -233,6 +236,19 @@ Las migraciones incluyen `0002_ad_format_catalog` para crear el catálogo, sus r
   Antes de la última orden, comprueba que el destino mostrado es exactamente `OSAP_PUBLICIDAD`. La migración bloquea conexiones MySQL a cualquier otra base.
 - En desarrollo, `.env.example` mantiene SQLite como opción segura predeterminada. La API no crea tablas automáticamente sobre MySQL; el esquema se gestiona mediante Alembic.
 - Producción requiere `AI_PUBLICIDAD_SERVICE_TOKEN` para las operaciones de entrega, `AI_PUBLICIDAD_PUBLIC_BASE_URL` con HTTPS y una conexión que termine en `OSAP_PUBLICIDAD`. Antes de exponer los endpoints administrativos en producción hay que implementar autenticación y autorización.
+
+### Campaña inicial de OpenMusicRepository
+
+`scripts/seed_omr_campaign.py` prepara de forma idempotente cinco entradas de catálogo y la campaña propia **OpenMusicRepository — campaña de difusión** con cuatro creatividades:
+
+1. **Fondo OSAP adaptable**: admite 728×90 en escritorio y 320×50 en móvil.
+2. **Rectángulo destacado**: 300×250, orientado a un bloque centrado.
+3. **Formato vertical**: 160×600, asociado a la zona vertical/audiovisual.
+4. **Cuadrado compacto**: 200×200, alternativa que requiere menos adaptación de columna.
+
+Cada creatividad tiene texto promocional en español, destino `https://openmusicrepository.com/` y reglas por aplicación `osap` y ubicación (`header`, `content_top`, `sidebar` o `content_inline`). Se trata de creatividades de texto adaptable; no se ha inventado una imagen ni un vídeo. El formato 160×600 cataloga el tamaño del espacio, pero necesitará un recurso audiovisual y un reproductor antes de funcionar como vídeo real.
+
+La carga se prepara y revisa primero con `python scripts/seed_omr_campaign.py`; solo escribe al ejecutar `python scripts/seed_omr_campaign.py --apply` (o `--apply --allow-sqlite` para SQLite local). No se ha aplicado automáticamente a `OSAP_PUBLICIDAD`.
 
 ## 10. Prueba HTTP real de entrega y fallback
 
