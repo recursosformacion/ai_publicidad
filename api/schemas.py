@@ -1,6 +1,6 @@
 """Request/response contracts for ad serving and impression confirmation."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class PageContext(BaseModel):
@@ -14,6 +14,12 @@ class FormatRequest(BaseModel):
     type: str = Field(default="text", min_length=1, max_length=30)
     width: int | None = Field(default=None, ge=1, le=5000)
     height: int | None = Field(default=None, ge=1, le=5000)
+
+    @model_validator(mode="after")
+    def validate_dimensions(self) -> "FormatRequest":
+        if (self.width is None) != (self.height is None):
+            raise ValueError("width y height deben indicarse juntos para elegir un formato estándar")
+        return self
 
 
 class ServeAdRequest(BaseModel):
@@ -36,6 +42,10 @@ class AdPayload(BaseModel):
     language: str
     click_url: str
     is_house_ad: bool
+    ad_format_code: str | None = None
+    ad_format_name: str | None = None
+    ad_width: int | None = None
+    ad_height: int | None = None
 
 
 class ImpressionRequest(BaseModel):
