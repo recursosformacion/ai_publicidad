@@ -134,8 +134,17 @@ def test_admin_crud_and_delivery_uses_commercial_then_house_fallback(client, tes
     assert events.status_code == 200
     assert len(events.json()) == 1
 
-    # Rows referenced by delivery history cannot be deleted out from under reports.
-    assert client.delete(f"/api/v1/admin/creatives/{commercial_creative_id}").status_code == 409
+    # A creative with delivery history is archived, not hard-deleted.
+    deleted_creative = client.delete(f"/api/v1/admin/creatives/{commercial_creative_id}")
+    assert deleted_creative.status_code == 200
+    assert deleted_creative.json()["deleted"] is False
+    assert deleted_creative.json()["archived"] is True
+
+    # Deleting the campaign with history archives it and its associated creatives.
+    deleted_campaign = client.delete(f"/api/v1/admin/campaigns/{commercial_campaign_id}")
+    assert deleted_campaign.status_code == 200
+    assert deleted_campaign.json()["deleted"] is False
+    assert deleted_campaign.json()["archived"] is True
 
     with Session(test_engine) as db:
         saved_deliveries = db.scalars(select(AdDelivery)).all()
@@ -145,6 +154,48 @@ def test_admin_crud_and_delivery_uses_commercial_then_house_fallback(client, tes
         assert saved_events[0].event_type == "impression"
         saved_rule = db.get(TargetingRule, rule_id)
         assert saved_rule is not None
+        saved_creative = db.get(Creative, commercial_creative_id)
+        saved_campaign = db.get(Campaign, commercial_campaign_id)
+        assert saved_creative is not None and saved_creative.status == "archived"
+        assert saved_campaign is not None and saved_campaign.status == "archived"
+
+
+
+def test_delete_campaign_without_history_deletes_its_creatives_and_rules(client, test_engine):
+    campaign_response = client.post(
+        "/api/v1/admin/campaigns", json=_campaign_payload("cascade delete campaign")
+    )
+    assert campaign_response.status_code == 201
+    campaign_id = campaign_response.json()["id"]
+
+    creative_response = client.post(
+        "/api/v1/admin/creatives", json=_creative_payload(campaign_id, "cascade delete creative")
+    )
+    assert creative_response.status_code == 201
+    creative_id = creative_response.json()["id"]
+
+    rule_response = client.post(
+        "/api/v1/admin/targeting-rules",
+        json={
+            "creative_id": creative_id,
+            "rule_type": "page_type",
+            "rule_value": "work_detail",
+            "effect": "include",
+        },
+    )
+    assert rule_response.status_code == 201
+    rule_id = rule_response.json()["id"]
+
+    response = client.delete(f"/api/v1/admin/campaigns/{campaign_id}")
+    assert response.status_code == 200
+    assert response.json()["deleted"] is True
+    assert response.json()["archived"] is False
+
+    with Session(test_engine) as db:
+        assert db.get(Campaign, campaign_id) is None
+        assert db.get(Creative, creative_id) is None
+        assert db.get(TargetingRule, rule_id) is None
+        assert db.query(AdDelivery).count() == 0
 
 
 def test_admin_can_update_and_delete_configuration_without_history(client, test_engine):
