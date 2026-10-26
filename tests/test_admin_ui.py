@@ -20,7 +20,7 @@ def test_admin_panel_is_served_and_contains_navigation_and_crud_controls():
         "Impresiones y clics",
         'id="record-form"',
         'id="create"',
-        'class="detail-grid"',
+        'id="save-form"', 'openForm(r,true)', "controls[key].disabled=readOnly",
         "Borrar",
         "Editar",
         "Ver",
