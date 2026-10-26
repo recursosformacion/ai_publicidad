@@ -146,6 +146,18 @@ def test_admin_crud_and_delivery_uses_commercial_then_house_fallback(client, tes
     assert deleted_campaign.json()["deleted"] is False
     assert deleted_campaign.json()["archived"] is True
 
+    # Archived configuration disappears from normal lists, but remains accessible on demand.
+    assert commercial_campaign_id not in {
+        row["id"] for row in client.get("/api/v1/admin/campaigns").json()
+    }
+    archived_campaigns = client.get("/api/v1/admin/campaigns?include_archived=true").json()
+    assert any(row["id"] == commercial_campaign_id for row in archived_campaigns)
+    assert commercial_creative_id not in {
+        row["id"] for row in client.get("/api/v1/admin/creatives").json()
+    }
+    archived_creatives = client.get("/api/v1/admin/creatives?include_archived=true").json()
+    assert any(row["id"] == commercial_creative_id for row in archived_creatives)
+
     with Session(test_engine) as db:
         saved_deliveries = db.scalars(select(AdDelivery)).all()
         assert len(saved_deliveries) == 2
@@ -188,8 +200,7 @@ def test_delete_campaign_without_history_deletes_its_creatives_and_rules(client,
 
     response = client.delete(f"/api/v1/admin/campaigns/{campaign_id}")
     assert response.status_code == 200
-    assert response.json()["deleted"] is True
-    assert response.json()["archived"] is False
+    assert response.json() == {"deleted": True}
 
     with Session(test_engine) as db:
         assert db.get(Campaign, campaign_id) is None
