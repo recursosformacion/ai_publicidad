@@ -186,26 +186,29 @@ Las rutas CRUD están disponibles bajo `/api/v1/admin`. La pantalla web está en
 - **Campañas:** `GET/POST /campaigns`, `GET/PUT/DELETE /campaigns/{id}`.
 - **Creatividades:** `GET/POST /creatives`, `GET/PUT/DELETE /creatives/{id}`.
 - **Segmentación:** `GET/POST /targeting-rules`, `GET/PUT/DELETE /targeting-rules/{id}`.
+- **Formatos estándar:** `GET/POST /ad-formats`, `GET/PUT/DELETE /ad-formats/{id}`; se catalogan dimensiones, dispositivo, categoría y notas de adaptación.
 - **Histórico de entregas:** `GET /deliveries` y `GET /deliveries/{id}`, con filtros por campaña o creatividad.
 - **Histórico de eventos:** `GET /events` y `GET /events/{id}`, con filtros por tipo de evento y entrega.
 
 Las tablas de configuración tienen CRUD. `ad_deliveries` y `ad_events` son datos operativos e históricos: se consultan, pero no se editan ni borran desde la administración para no falsear métricas ni romper relaciones. Al borrar una creatividad con entregas, se archiva (`status = archived`) y deja de participar en futuras entregas, conservando sus relaciones históricas. Si se borra una campaña con entregas, se archiva también la campaña y todas sus creatividades. Si la campaña no tiene entregas, se elimina físicamente junto con sus creatividades y reglas de segmentación. Los registros archivados se ocultan de los listados normales; el control **Mostrar archivados** permite consultarlos y, si procede, reactivarlos. Las reglas admiten `application`, `page_type`, `placement`, `language`, `entity_type` y `entity_id`, con efecto `include` o `exclude`.
 
-En el panel `/admin`, cada listado muestra los campos principales y ofrece **Ver**. La acción **Ver** abre la misma pantalla de formulario que **Editar**, pero con todos los campos deshabilitados y sin opción de guardar; en las entregas y eventos se utiliza ese mismo formato de solo lectura. En campañas, creatividades y reglas también están **Editar** y **Borrar**, además de **Nuevo**. Los formularios incluyen selectores de campaña/creatividad. El filtro busca en el listado actual y **Mostrar archivados** recupera campañas, creatividades y reglas archivadas.
+En el panel `/admin`, cada listado muestra los campos principales y ofrece **Ver**. La acción **Ver** abre la misma pantalla de formulario que **Editar**, pero con todos los campos deshabilitados y sin opción de guardar; en las entregas y eventos se utiliza ese mismo formato de solo lectura. En campañas, creatividades, reglas y formatos están **Editar** y **Borrar**, además de **Nuevo**. La creatividad permite asignarle varios formatos estándar desde un selector múltiple. El filtro busca en el listado actual; **Mostrar archivados** recupera la configuración archivada y **Mostrar inactivos** los formatos desactivados.
 
 ## 8. Modelo de datos inicial
 
 **Tablas que existen en el esquema funcional actual:**
 
 1. `campaigns`: estado, fechas, prioridad y marca de anuncio propio.
-2. `creatives`: título, contenido, formato, idioma, destino y estado de aprobación.
-3. `targeting_rules`: reglas de inclusión/exclusión por aplicación, página, ubicación, idioma y entidad.
-4. `ad_deliveries`: entrega, token de impresión y confirmación de impresión.
-5. `ad_events`: impresiones y clics registrados.
+2. `creatives`: título, contenido, tipo de creatividad, idioma, destino y estado de aprobación.
+3. `ad_formats`: catálogo normalizado de tamaños, dispositivo, categoría y notas de integración.
+4. `creative_ad_formats`: relación muchos-a-muchos; un anuncio puede admitir varios tamaños, como el banner de escritorio y su variante móvil.
+5. `targeting_rules`: reglas de inclusión/exclusión por aplicación, página, ubicación, idioma y entidad.
+6. `ad_deliveries`: entrega, token de impresión, formato elegido y confirmación de impresión.
+7. `ad_events`: impresiones y clics registrados.
 
-**Entidades previstas para fases posteriores, que todavía no forman parte de esta migración:** `applications`, `advertisers`, `placements`, `orders/contracts`, configuración específica de anuncios propios, usuarios administrativos y auditoría.
+Las migraciones incluyen `0002_ad_format_catalog` para crear el catálogo, sus relaciones y el campo de formato histórico en `ad_deliveries`. Las dimensiones se guardan como enteros de píxeles; no se codifican dentro del texto del anuncio. Las entregas y los eventos se conservan como histórico.
 
-Se usan claves foráneas e índices en las tablas existentes. Las entregas y los eventos se conservan como histórico; informes más amplios, archivo de eventos y retención deben diseñarse en fases posteriores.
+**Entidades previstas para fases posteriores, que todavía no forman parte de esta migración:** `applications`, `advertisers`, `placements`, `orders/contracts`, usuarios administrativos y auditoría.
 
 ## 9. Base de datos y configuración
 
@@ -270,7 +273,9 @@ Si trabajas desde cero, instala también las dependencias de desarrollo (`python
 - `POST /api/v1/events/impression`: confirma la impresión con protección de idempotencia.
 - `GET /r/{token}`: registra el clic y redirige al destino almacenado en la creatividad, nunca a una URL recibida en la petición.
 - Modelos SQLAlchemy y primera migración Alembic; esquema local automático solo en desarrollo/pruebas.
-- CRUD REST para campañas, creatividades y reglas de segmentación; consultas paginadas de entregas y eventos.
+- CRUD REST para campañas, creatividades, reglas de segmentación y formatos estándar; consultas paginadas de entregas y eventos.
+- Catálogo de tamaños estándar, asociación múltiple de formatos por creatividad y selección por dimensiones solicitadas en el endpoint de entrega.
+- Script idempotente para cargar la campaña de OpenMusicRepository con cuatro creatividades, sin escribir en base de datos hasta añadir `--apply`.
 - Borrado seguro: eliminación física de configuración sin histórico y archivado automático cuando hay entregas, manteniendo intactas las estadísticas.
 - Panel web en `/admin` con menú de secciones, listados, filtros, acción **Ver** en formulario de solo lectura, formularios de alta/edición y confirmación de borrado.
 - Pruebas de integración HTTP usando una SQLite en memoria aislada, sin borrar ni escribir en la base configurada de OSAP.
@@ -279,24 +284,25 @@ Si trabajas desde cero, instala también las dependencias de desarrollo (`python
 
 ### Arranque local del prototipo
 
-El arranque siguiente es para desarrollo local con SQLite (valor predeterminado de `.env.example`) y no utiliza MySQL. Para usar la base MySQL de esta aplicación, crea su propio `osap.toml` desde `osap.toml.example`, copia los parámetros de conexión que corresponda reutilizar y fija `name = "OSAP_PUBLICIDAD"`. Deja vacía `AI_PUBLICIDAD_DATABASE_URL` para que lea ese fichero y sigue el procedimiento de la sección 9 antes de aplicar migraciones. La cuenta deberá tener permisos sobre ese esquema. El script `seed_house_ads.py` admite SQLite para desarrollo solo con la opción explícita `--allow-sqlite`; para MySQL exige que la base de destino sea `OSAP_PUBLICIDAD`.
+El arranque siguiente es para desarrollo local con SQLite (valor predeterminado de `.env.example`) y no utiliza MySQL. Para usar la base MySQL de esta aplicación, crea su propio `osap.toml` desde `osap.toml.example`, fija `name = "OSAP_PUBLICIDAD"` y sigue el procedimiento de la sección 9. La cuenta deberá tener permisos sobre ese esquema. Ejecuta las migraciones antes de cargar los anuncios.
 
-```bash
-python -m venv .venv
-# Activar el entorno virtual según el sistema operativo
-pip install -e ".[dev]"
-cp .env.example .env
-alembic upgrade head
+```powershell
+python -m pip install -e ".[dev]"
+python -m alembic upgrade head
+# Revisa primero el destino que muestra cada simulación.
 python scripts/seed_house_ads.py
+python scripts/seed_omr_campaign.py
+# Para desarrollo SQLite:
 python scripts/seed_house_ads.py --apply --allow-sqlite
+python scripts/seed_omr_campaign.py --apply --allow-sqlite
 uvicorn api.main:app --host 127.0.0.1 --port 8305
 ```
 
-En PowerShell, sustituye `cp .env.example .env` por `Copy-Item .env.example .env`. La primera llamada a `seed_house_ads.py` es una simulación y no escribe nada; `--apply` confirma la carga. El comando valida que una conexión MySQL apunte a `OSAP_PUBLICIDAD` y es idempotente: si campaña y creatividad ya existen, no duplica filas. En SQLite se niega a escribir salvo que añadas `--allow-sqlite`; esa opción es solo para desarrollo local. Para una carga real en MySQL, usa el `osap.toml` privado de esta aplicación y revisa la simulación antes de ejecutar `--apply`. Para ejecutar pruebas: `pytest -q`. Con el servicio arrancado, abre **http://127.0.0.1:8305/admin** para utilizar el panel local.
+En PowerShell, deja `AI_PUBLICIDAD_DATABASE_URL` vacía cuando quieras usar el `osap.toml` privado. Las dos cargas son idempotentes, pero deben revisarse por separado: `seed_house_ads.py` prepara un anuncio propio genérico de reserva y `seed_omr_campaign.py` añade cinco formatos estándar y la campaña propia de OpenMusicRepository con cuatro creatividades. No se han aplicado las cargas a tu base desde este cambio; `--apply` es una acción explícita. Para SQLite se exige `--allow-sqlite`; para MySQL el destino debe ser `OSAP_PUBLICIDAD`. Para ejecutar pruebas: `pytest -q`. Con el servicio arrancado, abre **http://127.0.0.1:8305/admin**.
 
 ### Pendiente antes de integrar en producción
 - Confirmar el resultado de CI y ejecutar el smoke test contra el servicio arrancado y la conexión real, después de comprobar que apunta a `OSAP_PUBLICIDAD`.
-- Ejecutar `scripts/seed_house_ads.py --apply` en la base correcta si todavía no se ha cargado la campaña y creatividad propias iniciales.
+- Ejecutar `scripts/seed_house_ads.py --apply` para la creatividad propia genérica de reserva y `scripts/seed_omr_campaign.py --apply` para el catálogo y los cuatro anuncios de OpenMusicRepository, una vez revisado el destino.
 - Revisar la idempotencia bajo peticiones concurrentes y endurecer autenticación/limitación de uso.
 - Validar la taxonomía con el código real de `osap-app`.
 - Añadir las entidades comerciales aún no modeladas (clientes/anunciantes, espacios, contratos/pedidos) y después sus informes y políticas de retención.
