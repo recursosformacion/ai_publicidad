@@ -76,6 +76,16 @@ def serve_ad(request: ServeAdRequest, db: Session = Depends(get_db)) -> AdPayloa
 
     selected: tuple[Creative, Campaign, AdFormat | None] | None = None
     size_requested = request.format.width is not None and request.format.height is not None
+    requested_catalog_format: AdFormat | None = None
+    if size_requested:
+        requested_catalog_format = db.scalar(
+            select(AdFormat).where(
+                AdFormat.is_active.is_(True),
+                AdFormat.width == request.format.width,
+                AdFormat.height == request.format.height,
+                AdFormat.device.in_(("both", request.device)),
+            )
+        )
 
     # A creative can support more than one standard size (for example, the OSAP
     # background banner has desktop and mobile variants). Prefer an exact active
@@ -111,6 +121,10 @@ def serve_ad(request: ServeAdRequest, db: Session = Depends(get_db)) -> AdPayloa
                     elif assigned_formats:
                         # Do not deliver a fixed-size creative into the wrong slot.
                         continue
+                    else:
+                        # A generic house ad can still fill a known requested slot;
+                        # record that slot in history even though the creative is reusable.
+                        matched_format = requested_catalog_format
                 elif assigned_formats:
                     # Old integrations that send no dimensions can keep using
                     # unassigned generic creatives until they start declaring a slot size.
