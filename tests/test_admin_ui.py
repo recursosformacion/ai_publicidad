@@ -12,7 +12,7 @@ def test_admin_panel_is_served_and_contains_navigation_and_crud_controls():
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     html = response.text
-    for label in (
+    for marker in (
         "Campañas",
         "Creatividades / anuncios",
         "Reglas de segmentación",
@@ -20,12 +20,15 @@ def test_admin_panel_is_served_and_contains_navigation_and_crud_controls():
         "Impresiones y clics",
         'id="record-form"',
         'id="create"',
-        'id="save-form"', 'openForm(r,true)', "controls[key].disabled=readOnly",
+        'id="save-form"',
+        "openForm(r,true)",
+        "controls[key].disabled=readOnly",
+        "specsForHistory(row)",
         "Borrar",
         "Editar",
         "Ver",
     ):
-        assert label in html
+        assert marker in html
 
 
 def test_history_sections_are_read_only_in_the_web_panel():
@@ -37,3 +40,5 @@ def test_history_sections_are_read_only_in_the_web_panel():
     assert 'deliveries:{label:"Entregas"' in html
     assert 'events:{label:"Impresiones y clics"' in html
     assert "editable:false" in html
+    assert 'id="detail-dialog"' not in html
+    assert 'id="detail-content"' not in html
