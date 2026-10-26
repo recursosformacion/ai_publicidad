@@ -101,6 +101,8 @@ class CreativeRead(CreativeInput):
     id: int
 
 
+
+
 class TargetingRuleInput(BaseModel):
     creative_id: int = Field(gt=0)
     rule_type: RuleType
@@ -119,6 +121,7 @@ class AdDeliveryRead(BaseModel):
     token: str
     creative_id: int
     campaign_id: int
+    ad_format_id: int | None = None
     application: str
     page_type: str
     entity_type: str | None
