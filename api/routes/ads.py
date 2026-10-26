@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from api.schemas import AdPayload, ServeAdRequest
 from application.security import require_service_token, validate_destination
-from domain.models import AdDelivery, Campaign, Creative, TargetingRule
+from domain.models import AdDelivery, AdFormat, Campaign, Creative, TargetingRule
 from infrastructure.config import get_settings
 from infrastructure.database import get_db
 
@@ -74,30 +74,65 @@ def serve_ad(request: ServeAdRequest, db: Session = Depends(get_db)) -> AdPayloa
         .order_by(Campaign.priority.desc(), Creative.id.asc())
     ).all()
 
-    selected: tuple[Creative, Campaign] | None = None
+    selected: tuple[Creative, Campaign, AdFormat | None] | None = None
+    size_requested = request.format.width is not None and request.format.height is not None
+
+    # A creative can support more than one standard size (for example, the OSAP
+    # background banner has desktop and mobile variants). Prefer an exact active
+    # size match, and only use unassigned generic creatives as fallback.
     for house_pass in (False, True):
-        for creative, campaign in rows:
-            if campaign.is_house_ad != house_pass or not _campaign_is_current(campaign, now):
-                continue
-            if creative.format not in {request.format.type, "responsive"}:
-                continue
-            if creative.language not in {request.page.language, "mul", "es"}:
-                continue
-            if not _matches_targeting(db, creative.id, request):
-                continue
-            try:
-                validate_destination(creative.destination_url)
-            except ValueError:
-                continue
-            selected = (creative, campaign)
-            break
+        size_passes = (True, False) if size_requested else (False,)
+        for exact_size_pass in size_passes:
+            for creative, campaign in rows:
+                if campaign.is_house_ad != house_pass or not _campaign_is_current(campaign, now):
+                    continue
+                if creative.format not in {request.format.type, "responsive"}:
+                    continue
+                if creative.language not in {request.page.language, "mul", "es"}:
+                    continue
+
+                assigned_formats = list(creative.ad_formats)
+                matched_format: AdFormat | None = None
+                if size_requested:
+                    if exact_size_pass:
+                        matched_format = next(
+                            (
+                                ad_format
+                                for ad_format in assigned_formats
+                                if ad_format.is_active
+                                and ad_format.width == request.format.width
+                                and ad_format.height == request.format.height
+                                and ad_format.device in {"both", request.device}
+                            ),
+                            None,
+                        )
+                        if matched_format is None:
+                            continue
+                    elif assigned_formats:
+                        # Do not deliver a fixed-size creative into the wrong slot.
+                        continue
+                elif assigned_formats:
+                    # Old integrations that send no dimensions can keep using
+                    # unassigned generic creatives until they start declaring a slot size.
+                    continue
+
+                if not _matches_targeting(db, creative.id, request):
+                    continue
+                try:
+                    validate_destination(creative.destination_url)
+                except ValueError:
+                    continue
+                selected = (creative, campaign, matched_format)
+                break
+            if selected:
+                break
         if selected:
             break
 
     if selected is None:
         raise HTTPException(status_code=503, detail="No compatible commercial or house ad configured")
 
-    creative, campaign = selected
+    creative, campaign, matched_format = selected
     token = secrets.token_urlsafe(32)
     delivery = AdDelivery(
         token=token,
@@ -109,6 +144,7 @@ def serve_ad(request: ServeAdRequest, db: Session = Depends(get_db)) -> AdPayloa
         entity_id=request.page.entity_id,
         placement=request.placement,
         language=request.page.language,
+        ad_format_id=matched_format.id if matched_format is not None else None,
     )
     db.add(delivery)
     db.commit()
@@ -127,4 +163,8 @@ def serve_ad(request: ServeAdRequest, db: Session = Depends(get_db)) -> AdPayloa
         language=creative.language,
         click_url=f"{settings.public_base_url.rstrip('/')}/r/{token}",
         is_house_ad=campaign.is_house_ad,
+        ad_format_code=matched_format.code if matched_format is not None else None,
+        ad_format_name=matched_format.name if matched_format is not None else None,
+        ad_width=matched_format.width if matched_format is not None else None,
+        ad_height=matched_format.height if matched_format is not None else None,
     )
