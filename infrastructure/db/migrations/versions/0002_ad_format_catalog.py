@@ -27,6 +27,9 @@ def upgrade() -> None:
             sa.Column("placement_notes", sa.Text(), nullable=True),
             sa.Column("is_active", sa.Boolean(), server_default=sa.true(), nullable=False),
         )
+    inspector = inspect(bind)
+    indexes = {item["name"] for item in inspector.get_indexes("ad_formats")}
+    if "ix_ad_formats_code" not in indexes:
         op.create_index("ix_ad_formats_code", "ad_formats", ["code"], unique=True)
 
     inspector = inspect(bind)
