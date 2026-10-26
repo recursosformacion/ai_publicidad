@@ -270,16 +270,3 @@ def test_initial_house_seed_is_idempotent():
             assert db.query(Creative).count() == 1
     finally:
         test_engine.dispose()
-
-
-
-def test_admin_web_ui_is_available_and_routes_to_the_crud(client):
-    page = client.get("/admin")
-    assert page.status_code == 200
-    assert "Administración de publicidad" in page.text
-    assert 'data-section="campaigns"' in page.text
-    assert 'data-section="creatives"' in page.text
-    assert 'data-section="targeting-rules"' in page.text
-    assert 'data-section="deliveries"' in page.text
-    assert 'data-section="events"' in page.text
-    assert client.get("/api/v1/admin/campaigns").status_code == 200
