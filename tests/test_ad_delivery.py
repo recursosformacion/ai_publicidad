@@ -158,9 +158,15 @@ def test_admin_crud_and_delivery_uses_commercial_then_house_fallback(client, tes
     archived_creatives = client.get("/api/v1/admin/creatives?include_archived=true").json()
     assert any(row["id"] == commercial_creative_id for row in archived_creatives)
 
+    # Archiving also excludes the old campaign and creative from future selection.
+    after_archive = client.post("/api/v1/ads/serve", json=_serve_payload())
+    assert after_archive.status_code == 200
+    assert after_archive.json()["kind"] == "house"
+    assert after_archive.json()["ad_id"] == house_creative_id
+
     with Session(test_engine) as db:
         saved_deliveries = db.scalars(select(AdDelivery)).all()
-        assert len(saved_deliveries) == 2
+        assert len(saved_deliveries) == 3
         saved_events = db.scalars(select(AdEvent)).all()
         assert len(saved_events) == 1
         assert saved_events[0].event_type == "impression"
