@@ -26,6 +26,11 @@ jobs:
         run: python -m pip install -e ".[dev]"
       - name: Run automated tests
         run: pytest -q
+      - name: Smoke-test database migrations on isolated SQLite
+        env:
+          AI_PUBLICIDAD_ENV: test
+          AI_PUBLICIDAD_DATABASE_URL: sqlite:///./migration-check.sqlite3
+        run: python -m alembic upgrade head
       - name: Check administration panel JavaScript syntax
         run: |
           python -c "from pathlib import Path; import re; html=Path('api/static/admin.html').read_text(encoding='utf-8'); match=re.search(r'<script>(.*?)</script>', html, re.S); assert match, 'script block missing'; Path('/tmp/ai_publicidad_admin.js').write_text(match.group(1), encoding='utf-8')"
@@ -34,6 +39,8 @@ jobs:
         run: python scripts/create_database.py --help
       - name: Check house-ad seed command starts correctly
         run: python scripts/seed_house_ads.py --help
+      - name: Check OpenMusicRepository campaign seed command starts correctly
+        run: python scripts/seed_omr_campaign.py --help
       - name: Check live delivery smoke test command starts correctly
         run: python scripts/smoke_test_delivery.py --help
       - name: Ensure production-style seed refuses accidental SQLite writes
