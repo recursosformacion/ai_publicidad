@@ -2,7 +2,17 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -17,8 +27,18 @@ class Base(DeclarativeBase):
 creative_ad_formats = Table(
     "creative_ad_formats",
     Base.metadata,
-    Column("creative_id", Integer, ForeignKey("creatives.id", ondelete="CASCADE"), primary_key=True),
-    Column("ad_format_id", Integer, ForeignKey("ad_formats.id", ondelete="RESTRICT"), primary_key=True),
+    Column(
+        "creative_id",
+        Integer,
+        ForeignKey("creatives.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "ad_format_id",
+        Integer,
+        ForeignKey("ad_formats.id", ondelete="RESTRICT"),
+        primary_key=True,
+    ),
 )
 
 
@@ -104,7 +124,7 @@ class AdDelivery(Base):
     placement: Mapped[str] = mapped_column(String(80), nullable=False)
     language: Mapped[str] = mapped_column(String(12), nullable=False)
     ad_format_id: Mapped[int | None] = mapped_column(
-        ForeignKey("ad_formats.id", ondelete="RESTRICT")
+        ForeignKey("ad_formats.id", name="fk_ad_deliveries_ad_format_id", ondelete="RESTRICT")
     )
     delivered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     impression_confirmed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
