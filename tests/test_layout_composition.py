@@ -382,3 +382,16 @@ def test_campaign_cooldown_uses_house_fallback_for_same_slot(client, test_engine
         assert db.query(AdDelivery).count() == 2
         assert db.query(AdEvent).count() == 2
 
+def test_requested_creative_does_not_bypass_targeting_rules(client, test_engine):
+    creative_ids = _seed_layout_candidates(client)
+    payload = _compose_payload(640, 320, creative_id=creative_ids["rectangle"])
+    payload["placement"] = "sidebar"
+
+    response = client.post("/api/v1/ads/compose", json=payload)
+    assert response.status_code == 200
+    assert 'data-layout-status="no-fill"' in response.text
+
+    with Session(test_engine) as db:
+        assert db.query(AdDelivery).count() == 0
+        assert db.query(AdEvent).count() == 0
+
