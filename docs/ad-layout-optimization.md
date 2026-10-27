@@ -115,7 +115,7 @@ Las campañas propias de OpenMusicRepository se etiquetan con la marca `OpenMusi
 }
 ```
 
-Este modo devuelve como máximo una creatividad del formato concreto. Si no hay una elegible, devuelve HTML `no-fill`.
+Este modo devuelve como máximo una creatividad del formato concreto. Si no hay una elegible, devuelve HTML `no-fill`. La petición puede incluir `creative_id` para solicitar una creatividad determinada; ese ID no anula las restricciones de campaña, fecha, ubicación, marca, cooldown ni formato. Si la creatividad no cumple las reglas, el resultado será `no-fill`.
 
 ### Área automática
 
@@ -138,7 +138,7 @@ Este modo devuelve como máximo una creatividad del formato concreto. Si no hay 
 }
 ```
 
-Las medidas son píxeles CSS del contenedor que ya existe en la página; no se deducen a partir de toda la pantalla. Límites de la petición: ancho hasta 2000 px, alto hasta 1200 px, 1–3 anuncios y separación de 0–32 px.
+Las medidas son píxeles CSS del contenedor que ya existe en la página; no se deducen a partir de toda la pantalla. Límites de la petición: ancho hasta 2000 px, alto hasta 1200 px, 1–3 anuncios y separación de 0–32 px. `creative_id` es opcional para limitar la petición a una creatividad; en ese caso se devuelve como máximo una pieza.
 
 ## 5. HTML directo y registro de vistas
 
