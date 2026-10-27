@@ -119,7 +119,7 @@ Con el servicio arrancado en desarrollo, abre **http://127.0.0.1:8305/layout-lab
 
 Las solicitudes del laboratorio usan `page.type=ad_layout_lab`; las muestras de la campaña deben tener la regla de ubicación `layout_lab`. Para añadir esa regla a las creatividades iniciales, vuelve a ejecutar de forma idempotente `python scripts/seed_omr_campaign.py --apply` después de revisar la conexión.
 
-**El laboratorio crea impresiones reales en la base de datos de desarrollo.** Está deshabilitado en `AI_PUBLICIDAD_ENV=production`; no se debe desplegar públicamente. No registra composiciones separadas ni ofrece un endpoint de previsualización sin efectos secundarios.
+**El laboratorio crea impresiones reales en la base de datos seleccionada.** Está deshabilitado en `AI_PUBLICIDAD_ENV=production`. En SQLite local se permite en desarrollo; si la aplicación usa MySQL, también requiere `AI_PUBLICIDAD_ENABLE_LAYOUT_LAB=true` como habilitación explícita. Recomendación: usar la base SQLite local y no un esquema compartido de producción. No registra composiciones separadas ni ofrece un endpoint de previsualización sin efectos secundarios.
 
 ## 5. Selección de anuncios
 
