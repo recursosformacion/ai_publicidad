@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from domain.models import AdFormat, Campaign, Creative, TargetingRule
+from domain.models import AdFormat, Brand, Campaign, Creative, TargetingRule
 from infrastructure.config import DATABASE_NAME, get_settings
 from infrastructure.database import SessionLocal
 
@@ -138,6 +138,21 @@ def seed_omr_campaign(db: Session) -> bool:
             changed = True
         formats_by_code[ad_format.code] = ad_format
 
+    brand = db.scalar(select(Brand).where(Brand.name == "OpenMusicRepository"))
+    if brand is None:
+        brand = Brand(
+            name="OpenMusicRepository",
+            website_url="https://openmusicrepository.com/",
+            notes="Marca propia de OSAP utilizada por los anuncios institucionales.",
+            is_active=True,
+        )
+        db.add(brand)
+        db.flush()
+        changed = True
+    elif not brand.is_active:
+        brand.is_active = True
+        changed = True
+
     campaign = db.scalar(select(Campaign).where(Campaign.name == CAMPAIGN_NAME))
     if campaign is None:
         campaign = Campaign(
@@ -145,6 +160,8 @@ def seed_omr_campaign(db: Session) -> bool:
             status="active",
             priority=-50,
             is_house_ad=True,
+            brand_id=brand.id,
+            minimum_interval_seconds=0,
         )
         db.add(campaign)
         db.flush()
@@ -154,6 +171,16 @@ def seed_omr_campaign(db: Session) -> bool:
             f"La campaña {CAMPAIGN_NAME!r} ya existe, pero no está marcada como anuncio propio. "
             "No se modificará automáticamente."
         )
+    elif campaign.brand_id is None:
+        campaign.brand_id = brand.id
+        changed = True
+    elif campaign.brand_id != brand.id:
+        existing_brand = db.get(Brand, campaign.brand_id)
+        if existing_brand is None or existing_brand.name != "OpenMusicRepository":
+            raise ValueError(
+                f"La campaña {CAMPAIGN_NAME!r} está asociada a otra marca. "
+                "No se cambiará automáticamente."
+            )
 
     for seed in CREATIVE_SEEDS:
         creative = db.scalar(
