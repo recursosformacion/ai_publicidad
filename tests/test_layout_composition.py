@@ -222,3 +222,26 @@ def test_layout_lab_is_local_only_and_page_is_packaged(client, monkeypatch):
     monkeypatch.setattr("api.routes.layout_lab.get_settings", lambda: SimpleNamespace(env="production"))
     hidden = client.get("/layout-lab")
     assert hidden.status_code == 404
+
+    # Development mode alone is not enough when pointed at a MySQL database.
+    monkeypatch.setattr(
+        "api.routes.layout_lab.get_settings",
+        lambda: SimpleNamespace(
+            env="development",
+            database_url="mysql+pymysql://user:password@localhost/OSAP_PUBLICIDAD",
+            enable_layout_lab=False,
+        ),
+    )
+    hidden_mysql = client.get("/layout-lab")
+    assert hidden_mysql.status_code == 404
+
+    monkeypatch.setattr(
+        "api.routes.layout_lab.get_settings",
+        lambda: SimpleNamespace(
+            env="development",
+            database_url="mysql+pymysql://user:password@localhost/OSAP_PUBLICIDAD",
+            enable_layout_lab=True,
+        ),
+    )
+    allowed_mysql = client.get("/layout-lab")
+    assert allowed_mysql.status_code == 200
