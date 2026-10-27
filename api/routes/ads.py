@@ -160,6 +160,50 @@ def _campaigns_in_cooldown(
     return suppressed
 
 
+def _latest_creative_deliveries(
+    db: Session,
+    creative_ids: set[int],
+    request: ComposeAdRequest | ServeAdRequest,
+    now: datetime,
+) -> dict[int, datetime]:
+    """Return the last display time per creative for the same slot context."""
+    if not creative_ids:
+        return {}
+    query = (
+        select(AdDelivery.creative_id, func.max(AdDelivery.delivered_at))
+        .where(
+            AdDelivery.creative_id.in_(creative_ids),
+            AdDelivery.application == request.application,
+            AdDelivery.page_type == request.page.type,
+            AdDelivery.placement == request.placement,
+            AdDelivery.delivered_at >= now - timedelta(days=30),
+        )
+        .group_by(AdDelivery.creative_id)
+    )
+    if request.page.entity_type is None:
+        query = query.where(AdDelivery.entity_type.is_(None))
+    else:
+        query = query.where(AdDelivery.entity_type == request.page.entity_type)
+    if request.page.entity_id is None:
+        query = query.where(AdDelivery.entity_id.is_(None))
+    else:
+        query = query.where(AdDelivery.entity_id == request.page.entity_id)
+    return {
+        int(creative_id): delivered_at
+        for creative_id, delivered_at in db.execute(query).all()
+        if delivered_at is not None
+    }
+
+
+def _last_shown_sort_value(delivered_at: datetime | None) -> float:
+    """Older or unseen creatives sort first among equal commercial priorities."""
+    if delivered_at is None:
+        return float("-inf")
+    if delivered_at.tzinfo is None:
+        delivered_at = delivered_at.replace(tzinfo=timezone.utc)
+    return delivered_at.timestamp()
+
+
 def _active_brand_ids(db: Session, campaign_ids: set[int], rows: list[tuple[Creative, Campaign]]) -> set[int]:
     brand_ids = {campaign.brand_id for _, campaign in rows if campaign.id in campaign_ids and campaign.brand_id}
     if not brand_ids:
