@@ -11,6 +11,7 @@ from api.routes.admin_ui import router as admin_ui_router
 from api.routes.clicks import router as clicks_router
 from api.routes.events import router as events_router
 from api.routes.health import router as health_router
+from api.routes.layout_lab import router as layout_lab_router
 from api.routes.metadata import router as metadata_router
 from domain.models import Base
 from infrastructure.config import get_settings
@@ -38,6 +39,7 @@ app = FastAPI(
 )
 
 app.include_router(health_router)
+app.include_router(layout_lab_router)
 app.include_router(metadata_router, prefix="/api/v1")
 app.include_router(ads_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
