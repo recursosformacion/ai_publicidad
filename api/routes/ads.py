@@ -316,6 +316,9 @@ def _choose_layout(
                 continue
             size_options.append(option)
             seen_creatives.add(option.creative.id)
+            # Bound combinatorial work while preserving the highest-priority candidates.
+            if len(size_options) >= 18:
+                break
         if not size_options:
             continue
 
@@ -429,8 +432,6 @@ def _render_layout_html(
         )
         deliveries.append(delivery)
         tokens.append(token)
-    db.commit()
-
     positions: list[tuple[int, int]] = []
     if layout.orientation == "row":
         x = 0
@@ -554,6 +555,8 @@ def compose_ads(request: ComposeAdRequest, db: Session = Depends(get_db)) -> HTM
 
     # Persist only individual deliveries/events. No composition record is created.
     markup = _render_layout_html(layout, area, request, db, now)
+    # Commit the delivery/impression rows only after a complete HTML fragment exists.
+    db.commit()
     return HTMLResponse(markup)
 
 
