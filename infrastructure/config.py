@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     )
     public_base_url: str = "http://127.0.0.1:8305"
     service_token: str = ""
+    enable_layout_lab: bool = False
     service_name: str = "ai_publicidad"
 
     @model_validator(mode="after")
