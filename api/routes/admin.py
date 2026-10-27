@@ -10,6 +10,8 @@ from api.admin_schemas import (
     AdEventRead,
     AdFormatInput,
     AdFormatRead,
+    BrandInput,
+    BrandRead,
     CampaignInput,
     CampaignRead,
     CreativeInput,
@@ -17,7 +19,17 @@ from api.admin_schemas import (
     TargetingRuleInput,
     TargetingRuleRead,
 )
-from domain.models import AdDelivery, AdEvent, AdFormat, Campaign, Creative, TargetingRule, creative_ad_formats
+from domain.models import (
+    AdDelivery,
+    AdEvent,
+    AdFormat,
+    Brand,
+    Campaign,
+    Creative,
+    TargetingRule,
+    brand_competitors,
+    creative_ad_formats,
+)
 from infrastructure.database import get_db
 
 # Authorization is intentionally deferred to a later phase.
@@ -48,6 +60,154 @@ def _resolve_ad_formats(db: Session, format_ids: list[int]) -> list[AdFormat]:
             detail=f"No existen estos formatos de anuncio: {missing_ids}",
         )
     return formats
+
+
+# Brands and competitor relationships
+
+def _brand_payload(db: Session, brand: Brand) -> dict[str, object]:
+    rows = db.execute(
+        select(brand_competitors.c.brand_left_id, brand_competitors.c.brand_right_id).where(
+            (brand_competitors.c.brand_left_id == brand.id)
+            | (brand_competitors.c.brand_right_id == brand.id)
+        )
+    ).all()
+    competitors = sorted(
+        right if left == brand.id else left
+        for left, right in rows
+    )
+    return {
+        "id": brand.id,
+        "name": brand.name,
+        "website_url": brand.website_url,
+        "notes": brand.notes,
+        "is_active": brand.is_active,
+        "competitor_brand_ids": competitors,
+    }
+
+
+def _set_brand_competitors(
+    db: Session,
+    brand_id: int,
+    competitor_ids: list[int],
+) -> None:
+    if brand_id in competitor_ids:
+        raise HTTPException(status_code=422, detail="Una marca no puede ser competidora de sí misma.")
+    other_ids = set(competitor_ids)
+    if other_ids:
+        found = set(
+            db.scalars(select(Brand.id).where(Brand.id.in_(other_ids))).all()
+        )
+        missing = sorted(other_ids - found)
+        if missing:
+            raise HTTPException(status_code=404, detail=f"No existen estas marcas competidoras: {missing}")
+
+    db.execute(
+        brand_competitors.delete().where(
+            (brand_competitors.c.brand_left_id == brand_id)
+            | (brand_competitors.c.brand_right_id == brand_id)
+        )
+    )
+    for other_id in sorted(other_ids):
+        left, right = sorted((brand_id, other_id))
+        db.execute(
+            brand_competitors.insert().values(
+                brand_left_id=left,
+                brand_right_id=right,
+            )
+        )
+
+
+@router.get("/brands", response_model=list[BrandRead])
+def list_brands(
+    include_inactive: bool = Query(default=False),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=200),
+    db: Session = Depends(get_db),
+) -> list[dict[str, object]]:
+    query = select(Brand)
+    if not include_inactive:
+        query = query.where(Brand.is_active.is_(True))
+    brands = list(db.scalars(query.order_by(Brand.name).offset(offset).limit(limit)).all())
+    return [_brand_payload(db, brand) for brand in brands]
+
+
+@router.post("/brands", response_model=BrandRead, status_code=status.HTTP_201_CREATED)
+def create_brand(payload: BrandInput, db: Session = Depends(get_db)) -> dict[str, object]:
+    brand = Brand(
+        name=payload.name.strip(),
+        website_url=payload.website_url,
+        notes=payload.notes,
+        is_active=payload.is_active,
+    )
+    db.add(brand)
+    _commit_or_conflict(db, "Ya existe una marca con ese nombre.")
+    db.refresh(brand)
+    try:
+        _set_brand_competitors(db, brand.id, payload.competitor_brand_ids)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return _brand_payload(db, brand)
+
+
+@router.get("/brands/{brand_id}", response_model=BrandRead)
+def get_brand(brand_id: int, db: Session = Depends(get_db)) -> dict[str, object]:
+    brand = db.get(Brand, brand_id)
+    if brand is None:
+        raise _not_found("Marca", brand_id)
+    return _brand_payload(db, brand)
+
+
+@router.put("/brands/{brand_id}", response_model=BrandRead)
+def replace_brand(
+    brand_id: int, payload: BrandInput, db: Session = Depends(get_db)
+) -> dict[str, object]:
+    brand = db.get(Brand, brand_id)
+    if brand is None:
+        raise _not_found("Marca", brand_id)
+    brand.name = payload.name.strip()
+    brand.website_url = payload.website_url
+    brand.notes = payload.notes
+    brand.is_active = payload.is_active
+    try:
+        _set_brand_competitors(db, brand.id, payload.competitor_brand_ids)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Ya existe una marca con ese nombre.") from exc
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(brand)
+    return _brand_payload(db, brand)
+
+
+@router.delete("/brands/{brand_id}")
+def delete_brand(brand_id: int, db: Session = Depends(get_db)) -> dict[str, object]:
+    brand = db.get(Brand, brand_id)
+    if brand is None:
+        raise _not_found("Marca", brand_id)
+    linked_campaigns = db.scalar(
+        select(func.count()).select_from(Campaign).where(Campaign.brand_id == brand_id)
+    ) or 0
+    if linked_campaigns:
+        brand.is_active = False
+        db.commit()
+        return {
+            "deleted": False,
+            "deactivated": True,
+            "message": "La marca se ha desactivado porque tiene campañas asociadas.",
+        }
+    db.execute(
+        brand_competitors.delete().where(
+            (brand_competitors.c.brand_left_id == brand_id)
+            | (brand_competitors.c.brand_right_id == brand_id)
+        )
+    )
+    db.delete(brand)
+    db.commit()
+    return {"deleted": True}
 
 
 # Standard ad-format catalogue
@@ -146,8 +306,14 @@ def list_campaigns(
     return list(db.scalars(query).all())
 
 
+def _validate_campaign_brand(db: Session, brand_id: int | None) -> None:
+    if brand_id is not None and db.get(Brand, brand_id) is None:
+        raise HTTPException(status_code=404, detail=f"Marca {brand_id} no existe")
+
+
 @router.post("/campaigns", response_model=CampaignRead, status_code=status.HTTP_201_CREATED)
 def create_campaign(payload: CampaignInput, db: Session = Depends(get_db)) -> Campaign:
+    _validate_campaign_brand(db, payload.brand_id)
     campaign = Campaign(**payload.model_dump())
     db.add(campaign)
     db.commit()
@@ -170,6 +336,7 @@ def replace_campaign(
     campaign = db.get(Campaign, campaign_id)
     if campaign is None:
         raise _not_found("Campaña", campaign_id)
+    _validate_campaign_brand(db, payload.brand_id)
     for key, value in payload.model_dump().items():
         setattr(campaign, key, value)
     db.commit()
