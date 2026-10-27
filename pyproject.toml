@@ -34,6 +34,7 @@ packages = ["api", "domain", "application", "infrastructure"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "api/static/admin.html" = "api/static/admin.html"
+"api/static/layout_lab.html" = "api/static/layout_lab.html"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
