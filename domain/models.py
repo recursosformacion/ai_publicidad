@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    BigInteger,
     String,
     Table,
     Text,
@@ -98,6 +99,46 @@ class Brand(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
 
+class Advertiser(Base):
+    """Commercial client that owns advertising orders."""
+    __tablename__ = "advertisers"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False, unique=True)
+    legal_name: Mapped[str | None] = mapped_column(String(240))
+    contact_name: Mapped[str | None] = mapped_column(String(160))
+    contact_email: Mapped[str | None] = mapped_column(String(254))
+    phone: Mapped[str | None] = mapped_column(String(60))
+    website_url: Mapped[str | None] = mapped_column(String(2048))
+    notes: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class AdOrder(Base):
+    """Commercial order/contract with budget, billing model and delivery limits."""
+    __tablename__ = "ad_orders"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    advertiser_id: Mapped[int] = mapped_column(ForeignKey("advertisers.id", ondelete="RESTRICT"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(180), nullable=False)
+    reference: Mapped[str | None] = mapped_column(String(100), unique=True)
+    status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    currency: Mapped[str] = mapped_column(String(3), default="EUR", nullable=False)
+    billing_model: Mapped[str] = mapped_column(String(10), default="fixed", nullable=False)
+    fixed_fee_cents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_budget_cents: Mapped[int | None] = mapped_column(Integer)
+    daily_budget_cents: Mapped[int | None] = mapped_column(Integer)
+    cpm_cents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cpc_cents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    impression_limit_total: Mapped[int | None] = mapped_column(Integer)
+    impression_limit_daily: Mapped[int | None] = mapped_column(Integer)
+    click_limit_total: Mapped[int | None] = mapped_column(Integer)
+    click_limit_daily: Mapped[int | None] = mapped_column(Integer)
+    pacing_mode: Mapped[str] = mapped_column(String(10), default="none", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
 class Campaign(Base):
     __tablename__ = "campaigns"
 
@@ -110,6 +151,13 @@ class Campaign(Base):
     is_house_ad: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     brand_id: Mapped[int | None] = mapped_column(ForeignKey("brands.id", ondelete="SET NULL"))
     minimum_interval_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    order_id: Mapped[int | None] = mapped_column(ForeignKey("ad_orders.id", ondelete="SET NULL"))
+    max_impressions_total: Mapped[int | None] = mapped_column(Integer)
+    max_impressions_daily: Mapped[int | None] = mapped_column(Integer)
+    max_clicks_total: Mapped[int | None] = mapped_column(Integer)
+    max_clicks_daily: Mapped[int | None] = mapped_column(Integer)
+    max_impressions_per_visitor: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    visitor_interval_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 class Creative(Base):
@@ -164,6 +212,7 @@ class AdDelivery(Base):
         ForeignKey("ad_formats.id", name="fk_ad_deliveries_ad_format_id", ondelete="RESTRICT")
     )
     delivered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    visitor_key_hash: Mapped[str | None] = mapped_column(String(64), index=True)
     impression_confirmed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     impression_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -176,3 +225,4 @@ class AdEvent(Base):
     event_type: Mapped[str] = mapped_column(String(20), nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     deduplication_key: Mapped[str | None] = mapped_column(String(100), unique=True)
+    charge_microcents: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)

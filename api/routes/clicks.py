@@ -6,7 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from application.security import validate_destination
-from domain.models import AdDelivery, AdEvent, Creative
+from application.commercial import charge_microcents_for_event
+from domain.models import AdDelivery, AdEvent, Campaign, Creative
 from infrastructure.database import get_db
 
 router = APIRouter(tags=["clicks"])
@@ -25,6 +26,8 @@ def click_through(token: str, db: Session = Depends(get_db)) -> RedirectResponse
     except ValueError as exc:
         raise HTTPException(status_code=410, detail="Ad destination is invalid") from exc
 
-    db.add(AdEvent(delivery_id=delivery.id, event_type="click"))
+    campaign = db.get(Campaign, delivery.campaign_id)
+    charge = charge_microcents_for_event(db, campaign, "click") if campaign else 0
+    db.add(AdEvent(delivery_id=delivery.id, event_type="click", charge_microcents=charge))
     db.commit()
     return RedirectResponse(url=destination, status_code=302)

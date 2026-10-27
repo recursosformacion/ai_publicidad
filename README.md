@@ -1,10 +1,12 @@
 # ai_publicidad
 
-Servicio independiente de publicidad directa para OSAP/OpenMusicRepository. El núcleo actual gestiona campañas, creatividades, segmentación, entrega de anuncios, impresiones, clics y redirecciones. El modelo de clientes/anunciantes, contratos y espacios configurables todavía está pendiente; la primera pantalla web de mantenimiento ya está disponible en `/admin`.
+Servicio independiente de publicidad directa para OSAP/OpenMusicRepository. El núcleo gestiona campañas, creatividades, segmentación, entrega de anuncios, impresiones, clics y redirecciones. Ya incluye anunciantes, pedidos/contratos, topes por campaña y pedido, presupuestos CPM/CPC, pacing y frecuencia por visitante. Siguen pendientes la integración real desde el frontend de OSAP, la autorización administrativa y un modelo específico de ubicaciones configurables.
 
 El proyecto es un servicio independiente **Python 3.11+ + FastAPI**, alineado con `AI_osap-auth`, `AI_osap-storage` y `AI_osap-support`. Ya existe un primer núcleo funcional; el contrato de integración con `osap-app` sigue pendiente de validar con el código real del frontend.
 
 ## Integración con OSAP
+
+El modelo comercial y los campos que controlan elegibilidad, presupuestos y frecuencia están descritos en [docs/commercial-delivery-controls.md](docs/commercial-delivery-controls.md).
 
 La guía de implementación se mantiene en el repositorio OSAP, tras revisar el frontend y su API actuales: [`docs/ads-integration.md` de AI_GAMEPC2](https://github.com/recursosformacion/AI_GAMEPC2/blob/main/docs/ads-integration.md).
 
@@ -156,7 +158,7 @@ Se seleccionan anuncios cuya campaña esté activa y dentro de sus fechas, cuyo 
 
 Las campañas también admiten `minimum_interval_seconds`. Si es mayor que cero, una entrega reciente en la misma aplicación, tipo de página, entidad y ubicación hace que esa campaña se omita temporalmente para ese contexto. No equivale a un límite por usuario: no hay identificador de visitante. Entre alternativas de igual prioridad también se prefiere la creatividad que lleva más tiempo sin mostrarse en ese contexto (histórico de rotación de hasta 30 días). Las restricciones aplicadas actualmente son estado, fechas, targeting, marca activa, formato/dispositivo, prioridad, cooldown e intervalo de rotación.
 
-**Todavía no están implementados** presupuestos, contratos, límites diarios/totales de impresiones, límites de clics ni pacing. Se añadirán como restricciones comerciales previas al cálculo geométrico, no como puntuaciones que puedan saltarse una condición de elegibilidad.
+Los presupuestos y topes de pedido/campaña, la elegibilidad del anunciante y del pedido, el pacing y la frecuencia por visitante ya se aplican como restricciones antes del cálculo geométrico. Aún no hay facturación fiscal, pagos, informes contables ni pruebas de carga comercial en producción. Consulta [Control comercial de entregas](docs/commercial-delivery-controls.md).
 
 ### Anuncios propios (reserva obligatoria)
 
@@ -176,12 +178,12 @@ Los anuncios propios se registran y contabilizan igual que los demás, pero con 
 Entidades de datos previstas:
 
 - **Brands / marcas** (implementado): nombre, web, notas, estado activo y relaciones simétricas de competencia.
-- **Campaigns / campañas** (parcialmente implementado): marca opcional, fechas, estado, prioridad e intervalo mínimo de repetición. Presupuestos, contratos y límites totales están pendientes.
-- **Advertisers / clientes comerciales** (pendiente): datos de contacto, estado y datos fiscales aplicables.
+- **Campaigns / campañas** (implementado): marca/pedido opcional, fechas, estado, prioridad, intervalo mínimo y topes de impresiones, clics y frecuencia por visitante.
+- **Advertisers / clientes comerciales** (implementado): nombre, datos de contacto, web, estado y archivado seguro. No sustituye una ficha fiscal completa.
 - **Creatives / anuncios**: campaña, título, texto, recurso visual, formato creativo, idioma, texto alternativo, destino y estado de aprobación.
 - **Placements / espacios**: aplicación, código de ubicación, formatos y dimensiones admitidas.
 - **Targeting / segmentación**: reglas para tipos de página, entidades concretas, ubicaciones, idiomas, dispositivos y categorías; reglas de inclusión y exclusión.
-- **Orders/contracts / pedidos o contratos**: condiciones contratadas, periodo, importe, modelo comercial y referencia documental.
+- **Orders/contracts / pedidos o contratos** (implementado): periodo, tarifa fija/CPM/CPC, presupuesto variable, topes, pacing y referencia contractual.
 - **Ad events / eventos**: impresiones, clics y otros eventos de seguimiento.
 - **Applications / aplicaciones cliente**: aplicaciones autorizadas, credenciales o claves rotables, estado y permisos.
 - **Audit log / auditoría**: cambios administrativos relevantes.
@@ -282,7 +284,7 @@ No se almacena una tabla de composiciones. Cada anuncio emitido se registra como
 
 Las migraciones `0002_ad_format_catalog` y `0003_brands_and_cooldown` añaden el catálogo de formatos, las relaciones de marcas y las reglas de intervalo temporal. Las dimensiones se guardan como enteros de píxeles; no se codifican dentro del texto del anuncio. No se guardan combinaciones publicitarias ni una tabla de composición: cada entrega se registra individualmente.
 
-**Entidades comerciales aún pendientes:** anunciantes/contactos más completos, contratos/pedidos, presupuestos y límites máximos de impresiones o clics, límites diarios, pacing e identificadores para frecuencia por visitante. No deben darse por implementados.
+**Pendiente:** autorización administrativa, factura/pago fiscal, informes contables, antifraude avanzado, retención configurable y pruebas de carga/concurrencia en MySQL. La clave HMAC de visitantes debe configurarse como secreto privado en producción.
 
 ## 9. Base de datos y configuración
 
@@ -391,12 +393,12 @@ uvicorn api.main:app --host 127.0.0.1 --port 8305
 En PowerShell, deja `AI_PUBLICIDAD_DATABASE_URL` vacía cuando quieras usar el `osap.toml` privado. Las dos cargas son idempotentes, pero deben revisarse por separado: `seed_house_ads.py` prepara un anuncio propio genérico de reserva y `seed_omr_campaign.py` añade cinco formatos estándar y la campaña propia de OpenMusicRepository con cuatro creatividades. No se han aplicado las cargas a tu base desde este cambio; `--apply` es una acción explícita. Para SQLite se exige `--allow-sqlite`; para MySQL el destino debe ser `OSAP_PUBLICIDAD`. Para ejecutar pruebas: `pytest -q`. Con el servicio arrancado, abre **http://127.0.0.1:8305/admin**.
 
 ### Pendiente antes de integrar en producción
-- Confirmar el resultado de CI y ejecutar el smoke test contra el servicio arrancado y la conexión real, después de comprobar que apunta a `OSAP_PUBLICIDAD`.
-- Ejecutar `scripts/seed_house_ads.py --apply` para la creatividad propia genérica de reserva y `scripts/seed_omr_campaign.py --apply` para el catálogo y los cuatro anuncios de OpenMusicRepository, una vez revisado el destino.
-- Revisar la idempotencia bajo peticiones concurrentes y endurecer autenticación/limitación de uso.
-- Validar la taxonomía con el código real de `osap-app`.
-- Añadir las entidades comerciales aún no modeladas (clientes/anunciantes, espacios, contratos/pedidos) y después sus informes y políticas de retención.
-- Implementar autenticación y autorización de administración antes de publicar el panel fuera de una red de confianza.
+- Confirmar CI y ejecutar smoke tests contra una instancia local aislada antes de conectar el frontend.
+- Revisar el destino de `scripts/seed_house_ads.py` y `scripts/seed_omr_campaign.py`; no se han aplicado a tu base de producción desde este cambio.
+- Validar la taxonomía de páginas y ubicaciones con el código real de `osap-app`.
+- Implementar autenticación/autorización administrativa antes de publicar el panel fuera de una red de confianza.
+- Diseñar placements configurables, informes/retención, conciliación fiscal y pruebas de carga/concurrencia real con MySQL.
+- Configurar `AI_PUBLICIDAD_VISITOR_HASH_SECRET` como secreto privado de producción.
 
 ### Fase 2 — API funcional
 - Entrega de anuncios.
@@ -405,9 +407,9 @@ En PowerShell, deja `AI_PUBLICIDAD_DATABASE_URL` vacía cuando quieras usar el `
 - Pruebas de campañas específicas y anuncios de reserva.
 
 ### Fase 3 — Administración comercial
-- Gestión de clientes, campañas, creatividades, ubicaciones y contratos.
-- Aprobación y activación de anuncios.
-- Informes por cliente, campaña, creatividad, página y ubicación.
+- CRUD de anunciantes, pedidos, campañas, creatividades, marcas, formatos y reglas de segmentación.
+- Aplicación automática de elegibilidad, topes comerciales, presupuestos, pacing y frecuencia por visitante.
+- Pendiente: autenticación, informes financieros completos, auditoría de configuración y factura/pago.
 
 ### Fase 4 — Integración con OSAP
 - Implementar el cliente API en `osap-app`.
