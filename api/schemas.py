@@ -45,6 +45,7 @@ class ComposeAdRequest(BaseModel):
     mode: Literal["auto_area", "fixed_format"] = "auto_area"
     area: AdArea | None = None
     format_code: str | None = Field(default=None, min_length=2, max_length=50)
+    creative_id: int | None = Field(default=None, gt=0)
     max_ads: int = Field(default=3, ge=1, le=3)
     gap: int = Field(default=12, ge=0, le=32)
     orientation: Literal["auto", "row", "column"] = "auto"
