@@ -17,6 +17,42 @@ AdFormatDevice = Literal["desktop", "mobile", "both"]
 AdFormatCategory = Literal["banner", "rectangle", "square", "skyscraper", "video", "other"]
 
 
+class BrandInput(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    website_url: str | None = Field(default=None, max_length=2048)
+    notes: str | None = Field(default=None, max_length=4000)
+    is_active: bool = True
+    competitor_brand_ids: list[int] = Field(default_factory=list, max_length=100)
+
+    @field_validator("website_url")
+    @classmethod
+    def validate_website_url(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        try:
+            return validate_destination(value)
+        except ValueError as exc:
+            raise ValueError("website_url debe ser una URL HTTP(S) válida") from exc
+
+    @field_validator("competitor_brand_ids")
+    @classmethod
+    def validate_competitors(cls, values: list[int]) -> list[int]:
+        if any(value <= 0 for value in values):
+            raise ValueError("Los identificadores de marca deben ser positivos")
+        if len(set(values)) != len(values):
+            raise ValueError("No se puede repetir una marca competidora")
+        return values
+
+
+class BrandRead(BaseModel):
+    id: int
+    name: str
+    website_url: str | None = None
+    notes: str | None = None
+    is_active: bool
+    competitor_brand_ids: list[int] = Field(default_factory=list)
+
+
 class AdFormatInput(BaseModel):
     code: str = Field(min_length=2, max_length=50, pattern=r"^[a-z0-9][a-z0-9_-]*$")
     name: str = Field(min_length=2, max_length=120)
@@ -40,6 +76,8 @@ class CampaignInput(BaseModel):
     ends_at: datetime | None = None
     priority: int = Field(default=0, ge=-100000, le=100000)
     is_house_ad: bool = False
+    brand_id: int | None = Field(default=None, gt=0)
+    minimum_interval_seconds: int = Field(default=0, ge=0, le=2592000)
 
     @model_validator(mode="after")
     def validate_dates(self) -> "CampaignInput":
