@@ -139,15 +139,18 @@ def create_brand(payload: BrandInput, db: Session = Depends(get_db)) -> dict[str
         notes=payload.notes,
         is_active=payload.is_active,
     )
-    db.add(brand)
-    _commit_or_conflict(db, "Ya existe una marca con ese nombre.")
-    db.refresh(brand)
     try:
+        db.add(brand)
+        db.flush()
         _set_brand_competitors(db, brand.id, payload.competitor_brand_ids)
         db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Ya existe una marca con ese nombre.") from exc
     except Exception:
         db.rollback()
         raise
+    db.refresh(brand)
     return _brand_payload(db, brand)
 
 
