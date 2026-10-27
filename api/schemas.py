@@ -30,6 +30,7 @@ class ServeAdRequest(BaseModel):
     placement: str = Field(min_length=1, max_length=80)
     format: FormatRequest = Field(default_factory=FormatRequest)
     device: str = Field(default="desktop", max_length=30)
+    visitor_id: str | None = Field(default=None, min_length=1, max_length=160)
 
 
 class AdArea(BaseModel):
@@ -46,6 +47,7 @@ class ComposeAdRequest(BaseModel):
     area: AdArea | None = None
     format_code: str | None = Field(default=None, min_length=2, max_length=50)
     creative_id: int | None = Field(default=None, gt=0)
+    visitor_id: str | None = Field(default=None, min_length=1, max_length=160)
     max_ads: int = Field(default=3, ge=1, le=3)
     gap: int = Field(default=12, ge=0, le=32)
     orientation: Literal["auto", "row", "column"] = "auto"
