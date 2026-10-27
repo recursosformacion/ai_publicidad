@@ -8,7 +8,7 @@ El proyecto es un servicio independiente **Python 3.11+ + FastAPI**, alineado co
 
 La guía de implementación se mantiene en el repositorio OSAP, tras revisar el frontend y su API actuales: [`docs/ads-integration.md` de AI_GAMEPC2](https://github.com/recursosformacion/AI_GAMEPC2/blob/main/docs/ads-integration.md).
 
-El diseño del siguiente paso funcional —reservas de tamaño fijo o composición automática de varias creatividades dentro de un área— está en [`docs/ad-layout-optimization.md`](docs/ad-layout-optimization.md). Es una especificación; el algoritmo aún no está implementado.
+El motor de composición ya está implementado en [`docs/ad-layout-optimization.md`](docs/ad-layout-optimization.md): filtra primero las campañas comercialmente elegibles, aplica marcas y restricciones temporales y después busca el tamaño más grande que encaje. Una composición solo usa anuncios del mismo tamaño y devuelve el HTML listo para insertar. El laboratorio visual permite comprobarlo sin escribir en la base de datos real.
 
 Importante: la SPA actual todavía usa `SponsorSlot` y `sponsors.json`; la integración requiere una fachada servidor-a-servidor en `osap-api`. No envíes `AI_PUBLICIDAD_SERVICE_TOKEN` al navegador ni publiques el panel `/admin` del servicio publicitario antes de añadir autorización.
 
@@ -18,7 +18,7 @@ Importante: la SPA actual todavía usa `SponsorSlot` y `sponsors.json`; la integ
 - `ai_publicidad` decide qué anuncio compatible devuelve; OSAP no necesita conocer clientes, contratos ni destinos finales.
 - Si no hay publicidad comercial válida, se devuelve un **anuncio propio de OSAP**. El espacio nunca queda vacío por falta de campañas.
 - Los clics pasan por `ai_publicidad`, que registra el evento y redirige al destino configurado en el servidor.
-- Se registran impresiones cuando el anuncio se muestra, no solo cuando se solicita.
+- En el endpoint JSON legado `/ads/serve` la impresión conserva confirmación separada; en `/ads/compose`, la emisión del HTML registra una impresión por cada anuncio incluido, de acuerdo con el contrato simplificado elegido.
 - El servicio debe poder admitir otras aplicaciones en el futuro, aunque la primera integración sea `osap-app`.
 - El código no contiene credenciales ni secretos. La configuración se obtiene del entorno o de un archivo local ignorado por Git.
 - MySQL es la base de datos de producción. SQLite se utilizará para desarrollo y pruebas automatizadas.
@@ -26,11 +26,11 @@ Importante: la SPA actual todavía usa `SponsorSlot` y `sponsors.json`; la integ
 
 ## 2. Arquitectura lógica
 
-1. **Aplicación cliente (`osap-app`)**: identifica la tipología de página, el espacio publicitario y el contexto; solicita el anuncio, lo presenta y confirma la impresión. Al pulsarlo, el navegador abre la URL de seguimiento recibida.
-2. **API de `ai_publicidad`**: autentica la aplicación, valida la petición, selecciona un anuncio comercial o propio y entrega los datos necesarios para mostrarlo.
-3. **Gestor publicitario**: mantiene clientes, campañas, creatividades, contratos/pedidos, segmentación, inventario y límites de entrega.
-4. **Seguimiento**: registra impresiones y clics con identificadores únicos; la ruta de clic obtiene el destino de la base de datos y efectúa una redirección HTTP.
-5. **Administración e informes**: permite gestionar el inventario y consultar resultados comerciales.
+1. **Aplicación cliente (`osap-app`)**: identifica la página y la ubicación física, reserva un área con medidas CSS y solicita el bloque. Puede elegir un formato fijo o dejar que el servicio componga el área. Con `/ads/compose` no tiene que construir cada tarjeta ni confirmar impresiones por separado.
+2. **API de `ai_publicidad`**: valida la petición, selecciona anuncios elegibles de acuerdo con campañas, ubicación, fechas, segmentación, marcas y restricciones temporales, y devuelve HTML calculado.
+3. **Motor de composición**: usa anuncios de un mismo tamaño por bloque, prueba el mayor tamaño disponible antes de bajar a formatos menores, calcula posiciones y no repite marcas ni incluye parejas competidoras.
+4. **Seguimiento**: el modo `/ads/compose` registra una entrega e impresión por tarjeta emitida; los clics pasan por `/r/{token}` y el destino se obtiene del registro almacenado.
+5. **Administración e informes**: permite mantener campañas, marcas y competidores, creatividades, formatos y reglas, y consultar el histórico.
 
 ## 3. Tipología de páginas de OSAP
 
@@ -248,6 +248,7 @@ Las rutas CRUD están disponibles bajo `/api/v1/admin`. La pantalla web está en
 - **Campañas:** `GET/POST /campaigns`, `GET/PUT/DELETE /campaigns/{id}`.
 - **Creatividades:** `GET/POST /creatives`, `GET/PUT/DELETE /creatives/{id}`.
 - **Segmentación:** `GET/POST /targeting-rules`, `GET/PUT/DELETE /targeting-rules/{id}`.
+- **Marcas y competencia:** `GET/POST /brands`, `GET/PUT/DELETE /brands/{id}`; las relaciones competidoras son simétricas.
 - **Formatos estándar:** `GET/POST /ad-formats`, `GET/PUT/DELETE /ad-formats/{id}`; se catalogan dimensiones, dispositivo, categoría y notas de adaptación.
 - **Histórico de entregas:** `GET /deliveries` y `GET /deliveries/{id}`, con filtros por campaña o creatividad.
 - **Histórico de eventos:** `GET /events` y `GET /events/{id}`, con filtros por tipo de evento y entrega.
@@ -260,17 +261,19 @@ En el panel `/admin`, cada listado muestra los campos principales y ofrece **Ver
 
 **Tablas que existen en el esquema funcional actual:**
 
-1. `campaigns`: estado, fechas, prioridad y marca de anuncio propio.
-2. `creatives`: título, contenido, tipo de creatividad, idioma, destino y estado de aprobación.
-3. `ad_formats`: catálogo normalizado de tamaños, dispositivo, categoría y notas de integración.
-4. `creative_ad_formats`: relación muchos-a-muchos; un anuncio puede admitir varios tamaños, como el banner de escritorio y su variante móvil.
-5. `targeting_rules`: reglas de inclusión/exclusión por aplicación, página, ubicación, idioma y entidad.
-6. `ad_deliveries`: entrega, token de impresión, formato elegido y confirmación de impresión.
-7. `ad_events`: impresiones y clics registrados.
+1. `campaigns`: estado, fechas, prioridad, marca asignada e intervalo mínimo de repetición.
+2. `brands`: marcas de anunciantes, web, notas y estado activo/inactivo.
+3. `brand_competitors`: relación simétrica entre marcas que no deben aparecer juntas en la misma composición.
+4. `creatives`: título, contenido, tipo de creatividad, idioma, destino y estado de aprobación.
+5. `ad_formats`: catálogo normalizado de tamaños, dispositivo, categoría y notas de integración.
+6. `creative_ad_formats`: relación muchos-a-muchos; un anuncio puede admitir varios tamaños, como el banner de escritorio y su variante móvil.
+7. `targeting_rules`: reglas de inclusión/exclusión por aplicación, página, ubicación, idioma y entidad.
+8. `ad_deliveries`: entrega, token de impresión, formato elegido y confirmación de impresión.
+9. `ad_events`: impresiones y clics registrados.
 
-Las migraciones incluyen `0002_ad_format_catalog` para crear el catálogo, sus relaciones y el campo de formato histórico en `ad_deliveries`. Las dimensiones se guardan como enteros de píxeles; no se codifican dentro del texto del anuncio. Las entregas y los eventos se conservan como histórico.
+Las migraciones `0002_ad_format_catalog` y `0003_brands_and_cooldown` añaden el catálogo de formatos, las relaciones de marcas y las reglas de intervalo temporal. Las dimensiones se guardan como enteros de píxeles; no se codifican dentro del texto del anuncio. No se guardan combinaciones publicitarias ni una tabla de composición: cada entrega se registra individualmente.
 
-**Entidades previstas para fases posteriores, que todavía no forman parte de esta migración:** `applications`, `advertisers`, `placements`, `orders/contracts`, usuarios administrativos y auditoría.
+**Entidades comerciales aún pendientes:** anunciantes/contactos más completos, contratos/pedidos, presupuestos y límites máximos de impresiones o clics, límites diarios, pacing e identificadores para frecuencia por visitante. No deben darse por implementados.
 
 ## 9. Base de datos y configuración
 
@@ -350,8 +353,9 @@ Si trabajas desde cero, instala también las dependencias de desarrollo (`python
 - `POST /api/v1/events/impression`: confirma la impresión con protección de idempotencia.
 - `GET /r/{token}`: registra el clic y redirige al destino almacenado en la creatividad, nunca a una URL recibida en la petición.
 - Modelos SQLAlchemy y primera migración Alembic; esquema local automático solo en desarrollo/pruebas.
-- CRUD REST para campañas, creatividades, reglas de segmentación y formatos estándar; consultas paginadas de entregas y eventos.
-- Catálogo de tamaños estándar, asociación múltiple de formatos por creatividad y selección por dimensiones solicitadas en el endpoint de entrega.
+- CRUD REST para campañas, marcas, relaciones de competencia, creatividades, reglas de segmentación y formatos estándar; consultas paginadas de entregas y eventos.
+- Catálogo de tamaños estándar, asociación de formatos por creatividad y composición de anuncios del mismo tamaño.
+- Selección comercial primero; cooldown por campaña en el mismo contexto, marcas competidoras excluidas del mismo bloque y prioridad por el tamaño más grande que cabe.
 - Script idempotente para cargar la campaña de OpenMusicRepository con cuatro creatividades, sin escribir en base de datos hasta añadir `--apply`.
 - Borrado seguro: eliminación física de configuración sin histórico y archivado automático cuando hay entregas, manteniendo intactas las estadísticas.
 - Panel web en `/admin` con menú de secciones, listados, filtros, acción **Ver** en formulario de solo lectura, formularios de alta/edición y confirmación de borrado.
