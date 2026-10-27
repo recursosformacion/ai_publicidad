@@ -566,6 +566,12 @@ def serve_ad(request: ServeAdRequest, db: Session = Depends(get_db)) -> AdPayloa
         .where(Creative.status == "approved")
         .order_by(Campaign.priority.desc(), Creative.id.asc())
     ).all()
+    temporally_suppressed = _campaigns_in_cooldown(
+        db, [campaign for _, campaign in rows], request, now
+    )
+    active_brands = _active_brand_ids(
+        db, {campaign.id for _, campaign in rows}, rows
+    )
 
     selected: tuple[Creative, Campaign, AdFormat | None] | None = None
     size_requested = request.format.width is not None and request.format.height is not None
@@ -588,6 +594,10 @@ def serve_ad(request: ServeAdRequest, db: Session = Depends(get_db)) -> AdPayloa
         for exact_size_pass in size_passes:
             for creative, campaign in rows:
                 if campaign.is_house_ad != house_pass or not _campaign_is_current(campaign, now):
+                    continue
+                if campaign.id in temporally_suppressed:
+                    continue
+                if campaign.brand_id is not None and campaign.brand_id not in active_brands:
                     continue
                 if creative.format not in {request.format.type, "responsive"}:
                     continue
