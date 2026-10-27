@@ -84,9 +84,13 @@ Los tamaños se catalogan en `ad_formats`, separados del tipo de creatividad. El
 
 Un anuncio puede asociarse a varios formatos estándar. El banner institucional de OpenMusicRepository se asocia a los dos tamaños de cabecera: escritorio y móvil. Cuando se solicitan dimensiones, la entrega prioriza un anuncio asignado exactamente a ese tamaño y dispositivo; si no lo hay, puede usar una creatividad genérica compatible como reserva, pero no un anuncio fijo de dimensiones distintas. Los clientes deben enviar `width` y `height` juntos; sin dimensiones, solo se entregan creatividades genéricas no asociadas a tamaños fijos.
 
-## 5. Composición automática del espacio
+## Motor de composición automática
 
-Además de `POST /api/v1/ads/serve` (una creatividad en JSON), el servicio ofrece `POST /api/v1/ads/compose`, que devuelve un fragmento **HTML listo para insertar**. La petición puede fijar un formato del catálogo o especificar el área disponible, la ubicación, el dispositivo, el número máximo de anuncios (1–3), la separación y la orientación. El algoritmo actual evalúa composiciones sencillas en fila o columna, comprueba que cada tarjeta cabe y no repite una creatividad en el mismo bloque.
+Además de `POST /api/v1/ads/serve` (una creatividad en JSON), el servicio ofrece `POST /api/v1/ads/compose`, que devuelve un fragmento **HTML listo para insertar**. El consumidor puede pedir un formato concreto, indicar un `creative_id` (sin saltarse las reglas de elegibilidad), o reservar un área y permitir que el servicio decida una composición de hasta tres anuncios.
+
+El orden del algoritmo es deliberado: primero selecciona el conjunto comercialmente elegible por estado, fechas, segmentación, idioma, marca activa y tiempo mínimo de repetición; solo después calcula la geometría. Entre los tamaños que caben, intenta primero el de mayor superficie y baja a otro menor si no puede colocar ninguno del tamaño anterior. Una composición nunca mezcla medidas: todas las piezas comparten exactamente ancho y alto. Se organizan en fila o columna y se descartan las combinaciones que exceden el área.
+
+Las campañas comerciales elegibles se consideran antes que la publicidad propia; los anuncios propios son reserva solo cuando no queda inventario comercial que pueda ocupar el hueco. Dentro de un bloque no se repite una campaña ni una marca, y no se muestran juntas marcas que se hayan registrado como competidoras.
 
 Ejemplo de petición automática:
 
@@ -148,20 +152,22 @@ La petición podrá incluir:
 - `device`: dispositivo.
 - `context`: categorías temáticas opcionales.
 
-Se seleccionarán anuncios cuya campaña esté activa y dentro de sus fechas, cuyo material esté aprobado y que coincidan con aplicación, página, ubicación, formato e idioma configurados. Las campañas podrán incluir o excluir tipos de página y entidades concretas.
+Se seleccionan anuncios cuya campaña esté activa y dentro de sus fechas, cuyo material esté aprobado y que coincida con aplicación, página, ubicación, formato e idioma configurados. Las reglas de inclusión/exclusión se aplican antes de la optimización del espacio. La prioridad de campaña ordena los anuncios elegibles del tamaño escogido.
 
-Cuando haya varias coincidencias, el orden de decisión será explícito: compromisos de ubicación exclusiva o prioridad contratada, límites de campaña, prioridad administrativa y rotación entre anuncios equivalentes. No se prometerá una ubicación exclusiva si no se ha contratado y configurado como tal.
+Las campañas también admiten `minimum_interval_seconds`. Si es mayor que cero, una entrega reciente en la misma aplicación, tipo de página, entidad y ubicación hace que esa campaña se omita temporalmente para ese contexto. No equivale a un límite por usuario: no hay identificador de visitante. Las restricciones aplicadas actualmente son estado, fechas, targeting, marca activa, formato/dispositivo, prioridad e intervalo temporal.
+
+**Todavía no están implementados** presupuestos, contratos, límites diarios/totales de impresiones, límites de clics ni pacing. Se añadirán como restricciones comerciales previas al cálculo geométrico, no como puntuaciones que puedan saltarse una condición de elegibilidad.
 
 ### Anuncios propios (reserva obligatoria)
 
-La base de datos tendrá anuncios propios de OSAP, identificados como tales y gestionados desde la misma administración. Se prepararán varias creatividades propias por formato/idioma/ubicación: por ejemplo, invitación a explorar el catálogo, descubrir recursos musicales o conocer la comunidad Los Amigos.
+La base de datos dispone de campañas propias de OSAP, identificadas como tales y gestionadas desde la misma administración. El seed de OpenMusicRepository registra además la marca propia `OpenMusicRepository` y cuatro creatividades con formatos de 728×90/320×50, 300×250, 160×600 y 200×200.
 
 Reglas:
 
 1. Primero se busca un anuncio comercial válido para la petición.
-2. Si no existe una coincidencia comercial válida, se busca un anuncio propio compatible.
-3. Si no hay uno específico, se utiliza un anuncio propio genérico compatible con ese formato.
-4. Solo si hay un fallo técnico que impide consultar el servicio se aplica el fallback local que se defina en `osap-app`; el servicio debe permitir que el cliente no deje un hueco visual.
+2. Si no existe ninguna creatividad comercial elegible para la ubicación y el tamaño disponible, se busca una campaña propia compatible.
+3. Si no hay una creatividad del formato solicitado, se intenta el siguiente tamaño menor que pueda encajar, manteniendo un tamaño homogéneo dentro de cada bloque.
+4. Si tampoco hay reserva compatible, el servicio devuelve un bloque `no-fill`; el consumidor puede mostrar su fallback local. Si hay un fallo técnico que impide consultar el servicio, OSAP conserva igualmente su fallback local.
 
 Los anuncios propios se registran y contabilizan igual que los demás, pero con `is_house_ad = true` o una clasificación equivalente. Sus impresiones y clics deben poder separarse de las métricas comerciales y no generar importes facturables.
 
@@ -169,9 +175,10 @@ Los anuncios propios se registran y contabilizan igual que los demás, pero con 
 
 Entidades de datos previstas:
 
-- **Advertisers / clientes**: datos comerciales, contacto, estado y datos fiscales necesarios.
-- **Campaigns / campañas**: cliente, nombre, fechas, estado, prioridad, objetivo, límites y condiciones comerciales.
-- **Creatives / anuncios**: campaña (nullable solo para anuncios propios, según el modelo final), título, texto, recurso visual, formato, idioma, texto alternativo, destino y estado de aprobación.
+- **Brands / marcas** (implementado): nombre, web, notas, estado activo y relaciones simétricas de competencia.
+- **Campaigns / campañas** (parcialmente implementado): marca opcional, fechas, estado, prioridad e intervalo mínimo de repetición. Presupuestos, contratos y límites totales están pendientes.
+- **Advertisers / clientes comerciales** (pendiente): datos de contacto, estado y datos fiscales aplicables.
+- **Creatives / anuncios**: campaña, título, texto, recurso visual, formato creativo, idioma, texto alternativo, destino y estado de aprobación.
 - **Placements / espacios**: aplicación, código de ubicación, formatos y dimensiones admitidas.
 - **Targeting / segmentación**: reglas para tipos de página, entidades concretas, ubicaciones, idiomas, dispositivos y categorías; reglas de inclusión y exclusión.
 - **Orders/contracts / pedidos o contratos**: condiciones contratadas, periodo, importe, modelo comercial y referencia documental.
@@ -270,6 +277,8 @@ En el panel `/admin`, cada listado muestra los campos principales y ofrece **Ver
 7. `targeting_rules`: reglas de inclusión/exclusión por aplicación, página, ubicación, idioma y entidad.
 8. `ad_deliveries`: entrega, token de impresión, formato elegido y confirmación de impresión.
 9. `ad_events`: impresiones y clics registrados.
+
+No se almacena una tabla de composiciones. Cada anuncio emitido se registra como una entrega independiente. La tabla `brand_competitors` es una relación simétrica: las parejas de marcas declaradas competidoras no pueden aparecer dentro de un mismo bloque.
 
 Las migraciones `0002_ad_format_catalog` y `0003_brands_and_cooldown` añaden el catálogo de formatos, las relaciones de marcas y las reglas de intervalo temporal. Las dimensiones se guardan como enteros de píxeles; no se codifican dentro del texto del anuncio. No se guardan combinaciones publicitarias ni una tabla de composición: cada entrega se registra individualmente.
 
