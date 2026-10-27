@@ -107,7 +107,7 @@ El laboratorio solicita espacios de distintos tamaños y dibuja el HTML real dev
 - espacio demasiado pequeño 140×80;
 - un formulario para probar dimensiones personalizadas, zona, dispositivo, número máximo de anuncios, separación y orientación.
 
-Las acciones crean entregas e impresiones reales en la base de datos de desarrollo. La página está deshabilitada si `AI_PUBLICIDAD_ENV=production`; no se debe publicar como una herramienta pública.
+Las acciones crean entregas e impresiones reales en la base de datos configurada. La página está deshabilitada si `AI_PUBLICIDAD_ENV=production`. En SQLite local se permite en desarrollo; si se usa MySQL, también hay que habilitar expresamente `AI_PUBLICIDAD_ENABLE_LAYOUT_LAB=true`. Para evitar contaminar las estadísticas reales, se recomienda probar contra `ai_publicidad_layout_lab.sqlite3` y no contra una base compartida.
 
 Para ver varios formatos en una misma composición, carga el catálogo y la campaña de OMR. El seed `scripts/seed_omr_campaign.py` añade una regla `placement=layout_lab` a cada una de las cuatro creatividades de muestra. Si la campaña ya estaba cargada antes de añadir dicha regla, ejecutar de nuevo el script con `--apply` después de comprobar la base hace la actualización idempotente.
 
