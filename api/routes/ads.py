@@ -4,16 +4,25 @@ import html
 import itertools
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from api.schemas import AdArea, AdPayload, ComposeAdRequest, FormatRequest, ServeAdRequest
 from application.security import require_service_token, validate_destination
-from domain.models import AdDelivery, AdEvent, AdFormat, Campaign, Creative, TargetingRule
+from domain.models import (
+    AdDelivery,
+    AdEvent,
+    AdFormat,
+    Brand,
+    Campaign,
+    Creative,
+    TargetingRule,
+    brand_competitors,
+)
 from infrastructure.config import get_settings
 from infrastructure.database import get_db
 
@@ -103,6 +112,73 @@ def _compose_context(request: ComposeAdRequest) -> ServeAdRequest:
     )
 
 
+def _campaigns_in_cooldown(
+    db: Session,
+    campaigns: list[Campaign],
+    request: ComposeAdRequest | ServeAdRequest,
+    now: datetime,
+) -> set[int]:
+    """Suppress repeats for the same application/page/entity/placement context only."""
+    intervals = {
+        campaign.id: campaign.minimum_interval_seconds
+        for campaign in campaigns
+        if campaign.minimum_interval_seconds > 0
+    }
+    if not intervals:
+        return set()
+
+    max_interval = max(intervals.values())
+    query = (
+        select(AdDelivery.campaign_id, func.max(AdDelivery.delivered_at))
+        .where(
+            AdDelivery.campaign_id.in_(list(intervals)),
+            AdDelivery.application == request.application,
+            AdDelivery.page_type == request.page.type,
+            AdDelivery.placement == request.placement,
+            AdDelivery.delivered_at >= now - timedelta(seconds=max_interval),
+        )
+        .group_by(AdDelivery.campaign_id)
+    )
+    if request.page.entity_type is None:
+        query = query.where(AdDelivery.entity_type.is_(None))
+    else:
+        query = query.where(AdDelivery.entity_type == request.page.entity_type)
+    if request.page.entity_id is None:
+        query = query.where(AdDelivery.entity_id.is_(None))
+    else:
+        query = query.where(AdDelivery.entity_id == request.page.entity_id)
+
+    suppressed: set[int] = set()
+    for campaign_id, delivered_at in db.execute(query).all():
+        if delivered_at is None:
+            continue
+        if delivered_at.tzinfo is None:
+            delivered_at = delivered_at.replace(tzinfo=timezone.utc)
+        if delivered_at + timedelta(seconds=intervals.get(campaign_id, 0)) > now:
+            suppressed.add(campaign_id)
+    return suppressed
+
+
+def _active_brand_ids(db: Session, campaign_ids: set[int], rows: list[tuple[Creative, Campaign]]) -> set[int]:
+    brand_ids = {campaign.brand_id for _, campaign in rows if campaign.id in campaign_ids and campaign.brand_id}
+    if not brand_ids:
+        return set()
+    return set(
+        db.scalars(
+            select(Brand.id).where(Brand.id.in_(brand_ids), Brand.is_active.is_(True))
+        ).all()
+    )
+
+
+def _brand_conflicts(db: Session) -> set[frozenset[int]]:
+    return {
+        frozenset((int(left), int(right)))
+        for left, right in db.execute(
+            select(brand_competitors.c.brand_left_id, brand_competitors.c.brand_right_id)
+        ).all()
+    }
+
+
 def _compose_options(
     db: Session,
     request: ComposeAdRequest,
@@ -117,10 +193,20 @@ def _compose_options(
         .order_by(Campaign.priority.desc(), Creative.id.asc())
     ).all()
     context_request = _compose_context(request)
+    temporally_suppressed = _campaigns_in_cooldown(
+        db, [campaign for _, campaign in rows], request, now
+    )
+    active_brands = _active_brand_ids(
+        db, {campaign.id for _, campaign in rows}, rows
+    )
     options: list[_AdOption] = []
 
     for creative, campaign in rows:
         if not _campaign_is_current(campaign, now):
+            continue
+        if campaign.id in temporally_suppressed:
+            continue
+        if campaign.brand_id is not None and campaign.brand_id not in active_brands:
             continue
         if creative.language not in {request.page.language, "mul", "es"}:
             continue
@@ -142,21 +228,18 @@ def _compose_options(
                 continue
             if assigned_formats and fixed_format.id not in {item.id for item in assigned_formats}:
                 continue
-            # Unassigned responsive creatives are flexible and may use the requested format.
             options.append(_AdOption(creative, campaign, fixed_format))
             continue
 
         if assigned_formats:
             candidate_formats = assigned_formats
         else:
-            # Unassigned responsive/text creatives are flexible, but still use a catalogued
-            # size so both the layout and the delivery history have exact dimensions.
             candidate_formats = list(
                 db.scalars(
                     select(AdFormat).where(
                         AdFormat.is_active.is_(True),
                         AdFormat.device.in_(("both", request.device)),
-                    )
+                    ).order_by(AdFormat.width.desc(), AdFormat.height.desc())
                 ).all()
             )
 
@@ -167,17 +250,18 @@ def _compose_options(
                 continue
             options.append(_AdOption(creative, campaign, ad_format))
 
-    # Bound the runtime search. No generated layout is stored; candidates are rebuilt for
-    # each request. At most 18 options means fewer than 1,000 three-item combinations.
-    options.sort(
+    # Commercially eligible campaigns are selected first. Own ads are a fallback pool,
+    # not a way to displace an eligible commercial campaign or mix unrelated objectives.
+    commercial_options = [option for option in options if not option.campaign.is_house_ad]
+    selected_pool = commercial_options or [option for option in options if option.campaign.is_house_ad]
+    selected_pool.sort(
         key=lambda option: (
-            option.campaign.is_house_ad,  # commercial before house ads
             -option.campaign.priority,
             option.creative.id,
-            option.ad_format.width * option.ad_format.height,
+            option.ad_format.width * option.ad_format.height * -1,
         )
     )
-    return options[:18]
+    return selected_pool
 
 
 def _layout_dimensions(items: tuple[_AdOption, ...], orientation: str, gap: int) -> tuple[int, int]:
@@ -192,23 +276,17 @@ def _layout_dimensions(items: tuple[_AdOption, ...], orientation: str, gap: int)
     )
 
 
-def _layout_score(items: tuple[_AdOption, ...], area: AdArea, orientation: str, gap: int) -> float:
-    width, height = _layout_dimensions(items, orientation, gap)
-    used_area = sum(item.width * item.height for item in items)
-    area_utilization = used_area / (area.width * area.height)
-    # A modest bonus encourages useful combinations, but never beats a dramatically
-    # better fit. Geometry is a hard constraint; commercial/house status is a tie-breaker.
-    count_bonus = 0.065 * (len(items) - 1)
-    types = {item.campaign.is_house_ad for item in items}
-    commercial_bonus = 0.025 if types == {False} else 0.0
-    mixed_penalty = 0.02 if len(types) > 1 else 0.0
-    priority_bonus = sum(max(-100, min(100, item.campaign.priority)) for item in items)
-    priority_bonus = priority_bonus / max(1, len(items)) * 0.00005
-    orientation_bonus = 0.0001 if (
-        (area.width >= area.height and orientation == "row")
-        or (area.height > area.width and orientation == "column")
-    ) else 0.0
-    return area_utilization * 0.78 + count_bonus + commercial_bonus - mixed_penalty + priority_bonus + orientation_bonus
+def _brands_are_compatible(items: tuple[_AdOption, ...], competitor_pairs: set[frozenset[int]]) -> bool:
+    brand_ids = [item.campaign.brand_id for item in items if item.campaign.brand_id is not None]
+    # Even non-competing creatives from the same registered brand are not duplicated
+    # in one block; explicit competitor pairs additionally prohibit adjacent competitors.
+    if len(set(brand_ids)) != len(brand_ids):
+        return False
+    for left, right in itertools.combinations(brand_ids, 2):
+        if frozenset((left, right)) in competitor_pairs:
+            return False
+    campaign_ids = [item.campaign.id for item in items]
+    return len(set(campaign_ids)) == len(campaign_ids)
 
 
 def _choose_layout(
@@ -217,35 +295,86 @@ def _choose_layout(
     max_ads: int,
     gap: int,
     requested_orientation: str,
+    competitor_pairs: set[frozenset[int]],
 ) -> _Layout | None:
     if not options:
         return None
-    orientations = (
-        ("row", "column")
-        if requested_orientation == "auto"
-        else (requested_orientation,)
-    )
-    best: _Layout | None = None
 
-    for count in range(1, min(max_ads, len(options), 3) + 1):
-        for items in itertools.combinations(options, count):
-            if len({item.creative.id for item in items}) != count:
+    # Strictly homogeneous composition: try the largest available standard size first.
+    sizes = sorted(
+        {(item.width, item.height) for item in options},
+        key=lambda size: (size[0] * size[1], min(size), max(size)),
+        reverse=True,
+    )
+    for width, height in sizes:
+        size_options: list[_AdOption] = []
+        seen_creatives: set[int] = set()
+        for option in options:
+            if (option.width, option.height) != (width, height):
                 continue
-            # Keep each combination deterministically ordered by candidate preference.
-            for orientation in orientations:
-                width, height = _layout_dimensions(items, orientation, gap)
-                if width > area.width or height > area.height:
+            if option.creative.id in seen_creatives:
+                continue
+            size_options.append(option)
+            seen_creatives.add(option.creative.id)
+        if not size_options:
+            continue
+
+        possible_orientations = (
+            ("row", "column")
+            if requested_orientation == "auto"
+            else (requested_orientation,)
+        )
+        capacities: list[tuple[str, int]] = []
+        for orientation in possible_orientations:
+            if orientation == "row":
+                capacity = (area.width + gap) // (width + gap) if height <= area.height else 0
+            else:
+                capacity = (area.height + gap) // (height + gap) if width <= area.width else 0
+            if capacity > 0:
+                capacities.append((orientation, min(max_ads, capacity, len(size_options))))
+        if not capacities:
+            continue
+
+        largest_count = max(capacity for _, capacity in capacities)
+        # A larger slot wins before any smaller slot is considered. Within that slot,
+        # use as many distinct, commercially ranked and brand-compatible ads as fit.
+        for count in range(largest_count, 0, -1):
+            best: _Layout | None = None
+            best_key: tuple[int, tuple[int, ...]] | None = None
+            for items in itertools.combinations(size_options, count):
+                if not _brands_are_compatible(items, competitor_pairs):
                     continue
-                layout = _Layout(
-                    orientation=orientation if count > 1 else "single",
-                    items=items,
-                    score=_layout_score(items, area, orientation, gap),
-                    width=width,
-                    height=height,
-                )
-                if best is None or layout.score > best.score:
-                    best = layout
-    return best
+                for orientation, capacity in capacities:
+                    if count > capacity:
+                        continue
+                    layout_width, layout_height = _layout_dimensions(items, orientation, gap)
+                    if layout_width > area.width or layout_height > area.height:
+                        continue
+                    priorities = tuple(sorted(
+                        (item.campaign.priority for item in items), reverse=True
+                    ))
+                    key = (sum(priorities), priorities)
+                    if best is None or key > best_key:
+                        best = _Layout(
+                            orientation=orientation if count > 1 else "single",
+                            items=items,
+                            score=float(sum(priorities)),
+                            width=layout_width,
+                            height=layout_height,
+                        )
+                        best_key = key
+            if best is not None:
+                # When two orientations fit the same number of cards, prefer the natural
+                # direction of the available area rather than mixing sizes.
+                if len(best.items) > 1 and requested_orientation == "auto":
+                    preferred = "row" if area.width >= area.height else "column"
+                    if _layout_dimensions(best.items, preferred, gap)[0] <= area.width and _layout_dimensions(best.items, preferred, gap)[1] <= area.height:
+                        best = _Layout(
+                            preferred, best.items, best.score,
+                            *_layout_dimensions(best.items, preferred, gap),
+                        )
+                return best
+    return None
 
 
 def _render_layout_html(
@@ -411,7 +540,14 @@ def compose_ads(request: ComposeAdRequest, db: Session = Depends(get_db)) -> HTM
             else None
         )
     else:
-        layout = _choose_layout(options, area, max_ads, request.gap, request.orientation)
+        layout = _choose_layout(
+            options,
+            area,
+            max_ads,
+            request.gap,
+            request.orientation,
+            _brand_conflicts(db),
+        )
 
     if layout is None:
         return HTMLResponse(_render_layout_html(None, area, request, db, now))
