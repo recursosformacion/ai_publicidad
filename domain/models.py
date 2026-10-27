@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     ForeignKey,
@@ -63,6 +64,40 @@ class AdFormat(Base):
     )
 
 
+brand_competitors = Table(
+    "brand_competitors",
+    Base.metadata,
+    Column(
+        "brand_left_id",
+        Integer,
+        ForeignKey("brands.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "brand_right_id",
+        Integer,
+        ForeignKey("brands.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    CheckConstraint(
+        "brand_left_id < brand_right_id",
+        name="ck_brand_competitors_canonical_pair",
+    ),
+)
+
+
+class Brand(Base):
+    """Registered advertiser brand; competitor links prevent conflicting ads in one block."""
+
+    __tablename__ = "brands"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False, unique=True, index=True)
+    website_url: Mapped[str | None] = mapped_column(String(2048))
+    notes: Mapped[str | None] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
 class Campaign(Base):
     __tablename__ = "campaigns"
 
@@ -73,6 +108,8 @@ class Campaign(Base):
     ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     priority: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_house_ad: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    brand_id: Mapped[int | None] = mapped_column(ForeignKey("brands.id", ondelete="SET NULL"))
+    minimum_interval_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 class Creative(Base):
