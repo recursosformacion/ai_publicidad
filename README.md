@@ -393,12 +393,12 @@ uvicorn api.main:app --host 127.0.0.1 --port 8305
 En PowerShell, deja `AI_PUBLICIDAD_DATABASE_URL` vacía cuando quieras usar el `osap.toml` privado. Las dos cargas son idempotentes, pero deben revisarse por separado: `seed_house_ads.py` prepara un anuncio propio genérico de reserva y `seed_omr_campaign.py` añade cinco formatos estándar y la campaña propia de OpenMusicRepository con cuatro creatividades. No se han aplicado las cargas a tu base desde este cambio; `--apply` es una acción explícita. Para SQLite se exige `--allow-sqlite`; para MySQL el destino debe ser `OSAP_PUBLICIDAD`. Para ejecutar pruebas: `pytest -q`. Con el servicio arrancado, abre **http://127.0.0.1:8305/admin**.
 
 ### Pendiente antes de integrar en producción
-- Confirmar el resultado de CI y ejecutar el smoke test contra el servicio arrancado y la conexión real, después de comprobar que apunta a `OSAP_PUBLICIDAD`.
-- Ejecutar `scripts/seed_house_ads.py --apply` para la creatividad propia genérica de reserva y `scripts/seed_omr_campaign.py --apply` para el catálogo y los cuatro anuncios de OpenMusicRepository, una vez revisado el destino.
-- Revisar la idempotencia bajo peticiones concurrentes y endurecer autenticación/limitación de uso.
-- Validar la taxonomía con el código real de `osap-app`.
-- Completar autenticación/autorización administrativa; diseñar el modelo de placements; desarrollar informes y políticas de retención; probar límites y pacing bajo concurrencia real.
-- Implementar autenticación y autorización de administración antes de publicar el panel fuera de una red de confianza.
+- Confirmar CI y ejecutar smoke tests contra una instancia local aislada antes de conectar el frontend.
+- Revisar el destino de `scripts/seed_house_ads.py` y `scripts/seed_omr_campaign.py`; no se han aplicado a tu base de producción desde este cambio.
+- Validar la taxonomía de páginas y ubicaciones con el código real de `osap-app`.
+- Implementar autenticación/autorización administrativa antes de publicar el panel fuera de una red de confianza.
+- Diseñar placements configurables, informes/retención, conciliación fiscal y pruebas de carga/concurrencia real con MySQL.
+- Configurar `AI_PUBLICIDAD_VISITOR_HASH_SECRET` como secreto privado de producción.
 
 ### Fase 2 — API funcional
 - Entrega de anuncios.
