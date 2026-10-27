@@ -33,9 +33,17 @@ jobs:
         run: python -m alembic upgrade head
       - name: Check web interface JavaScript syntax
         run: |
-          python -c "from pathlib import Path; import re; \
-          names=('admin.html','layout_lab.html'); \
-          [(lambda p: Path('/tmp/ai_publicidad_'+p.stem+'.js').write_text(re.search(r'<script>(.*?)</script>', p.read_text(encoding='utf-8'), re.S).group(1), encoding='utf-8'))(Path('api/static')/name) for name in names]"
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          for name in ("admin.html", "layout_lab.html"):
+              source = (Path("api/static") / name).read_text(encoding="utf-8")
+              match = re.search(r"<script>(.*?)</script>", source, re.S)
+              assert match, f"script block missing in {name}"
+              target = Path("/tmp/ai_publicidad_" + Path(name).stem + ".js")
+              target.write_text(match.group(1), encoding="utf-8")
+          PY
           node --check /tmp/ai_publicidad_admin.js
           node --check /tmp/ai_publicidad_layout_lab.js
       - name: Check database provisioning command starts correctly
