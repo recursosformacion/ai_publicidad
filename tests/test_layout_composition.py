@@ -82,26 +82,27 @@ def _seed_layout_candidates(client) -> dict[str, int]:
     square = _make_format(client, "lab_square_200x200", 200, 200, "square")
     banner = _make_format(client, "lab_banner_320x50", 320, 50, "banner")
 
-    campaign = client.post(
-        "/api/v1/admin/campaigns",
-        json={
-            "name": "Layout lab sample campaign",
-            "status": "active",
-            "starts_at": None,
-            "ends_at": None,
-            "priority": 10,
-            "is_house_ad": True,
-        },
-    )
-    assert campaign.status_code == 201, campaign.text
-    campaign_id = campaign.json()["id"]
+    def add_house(title: str, fmt_id: int) -> int:
+        campaign = client.post(
+            "/api/v1/admin/campaigns",
+            json={
+                "name": f"Layout lab campaign {title}",
+                "status": "active",
+                "starts_at": None,
+                "ends_at": None,
+                "priority": 10,
+                "is_house_ad": True,
+            },
+        )
+        assert campaign.status_code == 201, campaign.text
+        return _make_creative(client, campaign.json()["id"], title, fmt_id)
 
     return {
-        "rectangle": _make_creative(client, campaign_id, "Lab rectangle", rectangle),
-        "square": _make_creative(client, campaign_id, "Lab square", square),
-        "banner": _make_creative(client, campaign_id, "Lab banner", banner),
+        "rectangle": add_house("Lab rectangle one", rectangle),
+        "rectangle2": add_house("Lab rectangle two", rectangle),
+        "square": add_house("Lab square", square),
+        "banner": add_house("Lab banner", banner),
     }
-
 
 def _compose_payload(width: int, height: int, **overrides) -> dict:
     payload = {
@@ -124,7 +125,7 @@ def _compose_payload(width: int, height: int, **overrides) -> dict:
     return payload
 
 
-def test_composer_returns_html_for_best_bounded_combination_and_counts_each_view(client, test_engine):
+def test_composer_uses_largest_available_size_and_never_mixes_sizes(client, test_engine):
     creative_ids = _seed_layout_candidates(client)
 
     response = client.post("/api/v1/ads/compose", json=_compose_payload(640, 320))
@@ -144,7 +145,9 @@ def test_composer_returns_html_for_best_bounded_combination_and_counts_each_view
     cards = parser.cards
     assert len(cards) == 2
     selected_creatives = {int(card["data-ad-id"] or 0) for card in cards}
-    assert selected_creatives == {creative_ids["rectangle"], creative_ids["square"]}
+    assert selected_creatives == {creative_ids["rectangle"], creative_ids["rectangle2"]}
+    # Every card in one block must have exactly the same dimensions.
+    assert {(card["data-width"], card["data-height"]) for card in cards} == {("300", "250")}
     for card in cards:
         x, y = int(card["data-x"] or 0), int(card["data-y"] or 0)
         width, height = int(card["data-width"] or 0), int(card["data-height"] or 0)
