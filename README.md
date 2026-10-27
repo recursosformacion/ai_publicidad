@@ -8,6 +8,8 @@ El proyecto es un servicio independiente **Python 3.11+ + FastAPI**, alineado co
 
 La guía de implementación se mantiene en el repositorio OSAP, tras revisar el frontend y su API actuales: [`docs/ads-integration.md` de AI_GAMEPC2](https://github.com/recursosformacion/AI_GAMEPC2/blob/main/docs/ads-integration.md).
 
+El diseño del siguiente paso funcional —reservas de tamaño fijo o composición automática de varias creatividades dentro de un área— está en [`docs/ad-layout-optimization.md`](docs/ad-layout-optimization.md). Es una especificación; el algoritmo aún no está implementado.
+
 Importante: la SPA actual todavía usa `SponsorSlot` y `sponsors.json`; la integración requiere una fachada servidor-a-servidor en `osap-api`. No envíes `AI_PUBLICIDAD_SERVICE_TOKEN` al navegador ni publiques el panel `/admin` del servicio publicitario antes de añadir autorización.
 
 ## 1. Objetivos y principios
