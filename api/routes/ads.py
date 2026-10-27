@@ -192,6 +192,8 @@ def _compose_options(
         .where(Creative.status == "approved")
         .order_by(Campaign.priority.desc(), Creative.id.asc())
     ).all()
+    if request.creative_id is not None:
+        rows = [(creative, campaign) for creative, campaign in rows if creative.id == request.creative_id]
     context_request = _compose_context(request)
     temporally_suppressed = _campaigns_in_cooldown(
         db, [campaign for _, campaign in rows], request, now
@@ -525,7 +527,7 @@ def compose_ads(request: ComposeAdRequest, db: Session = Depends(get_db)) -> HTM
         max_ads = 1
     else:
         assert area is not None
-        max_ads = request.max_ads
+        max_ads = 1 if request.creative_id is not None else request.max_ads
 
     assert area is not None
     options = _compose_options(db, request, area, now, fixed_format)
