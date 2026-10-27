@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     )
     public_base_url: str = "http://127.0.0.1:8305"
     service_token: str = ""
+    visitor_hash_secret: str = ""
     enable_layout_lab: bool = False
     service_name: str = "ai_publicidad"
 
@@ -116,6 +117,8 @@ class Settings(BaseSettings):
         if self.env == "production":
             if not self.service_token.strip():
                 raise ValueError("AI_PUBLICIDAD_SERVICE_TOKEN es obligatorio en producción")
+            if not self.visitor_hash_secret.strip():
+                raise ValueError("AI_PUBLICIDAD_VISITOR_HASH_SECRET es obligatorio en producción")
             if self.database_url.startswith("sqlite"):
                 raise ValueError("La base de datos de producción debe ser MySQL/MariaDB")
             try:
