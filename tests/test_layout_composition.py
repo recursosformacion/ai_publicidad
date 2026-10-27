@@ -395,3 +395,26 @@ def test_requested_creative_does_not_bypass_targeting_rules(client, test_engine)
         assert db.query(AdDelivery).count() == 0
         assert db.query(AdEvent).count() == 0
 
+def test_equal_priority_alternatives_rotate_to_the_least_recently_shown(client, test_engine):
+    creative_ids = _seed_layout_candidates(client)
+    payload = _compose_payload(300, 250, max_ads=1)
+    payload["page"]["entity_id"] = "rotation-slot"
+
+    first = client.post("/api/v1/ads/compose", json=payload)
+    assert first.status_code == 200
+    first_parser = _AdHtmlParser()
+    first_parser.feed(first.text)
+    assert len(first_parser.cards) == 1
+    assert int(first_parser.cards[0]["data-ad-id"] or 0) == creative_ids["rectangle"]
+
+    second = client.post("/api/v1/ads/compose", json=payload)
+    assert second.status_code == 200
+    second_parser = _AdHtmlParser()
+    second_parser.feed(second.text)
+    assert len(second_parser.cards) == 1
+    assert int(second_parser.cards[0]["data-ad-id"] or 0) == creative_ids["rectangle2"]
+
+    with Session(test_engine) as db:
+        assert db.query(AdDelivery).count() == 2
+        assert db.query(AdEvent).count() == 2
+
