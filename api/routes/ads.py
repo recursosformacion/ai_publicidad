@@ -83,6 +83,7 @@ class _AdOption:
     creative: Creative
     campaign: Campaign
     ad_format: AdFormat
+    last_delivered_at: datetime | None = None
 
     @property
     def width(self) -> int:
@@ -201,6 +202,9 @@ def _compose_options(
     active_brands = _active_brand_ids(
         db, {campaign.id for _, campaign in rows}, rows
     )
+    last_seen = _latest_creative_deliveries(
+        db, {creative.id for creative, _ in rows}, request, now
+    )
     options: list[_AdOption] = []
 
     for creative, campaign in rows:
@@ -230,7 +234,9 @@ def _compose_options(
                 continue
             if assigned_formats and fixed_format.id not in {item.id for item in assigned_formats}:
                 continue
-            options.append(_AdOption(creative, campaign, fixed_format))
+            options.append(
+                _AdOption(creative, campaign, fixed_format, last_seen.get(creative.id))
+            )
             continue
 
         if assigned_formats:
@@ -250,7 +256,9 @@ def _compose_options(
                 continue
             if ad_format.width > area.width or ad_format.height > area.height:
                 continue
-            options.append(_AdOption(creative, campaign, ad_format))
+            options.append(
+                _AdOption(creative, campaign, ad_format, last_seen.get(creative.id))
+            )
 
     # Commercially eligible campaigns are selected first. Own ads are a fallback pool,
     # not a way to displace an eligible commercial campaign or mix unrelated objectives.
@@ -259,8 +267,9 @@ def _compose_options(
     selected_pool.sort(
         key=lambda option: (
             -option.campaign.priority,
+            _last_shown_sort_value(option.last_delivered_at),
             option.creative.id,
-            option.ad_format.width * option.ad_format.height * -1,
+            -(option.ad_format.width * option.ad_format.height),
         )
     )
     return selected_pool
@@ -571,6 +580,18 @@ def serve_ad(request: ServeAdRequest, db: Session = Depends(get_db)) -> AdPayloa
         .where(Creative.status == "approved")
         .order_by(Campaign.priority.desc(), Creative.id.asc())
     ).all()
+    last_seen = _latest_creative_deliveries(
+        db, {creative.id for creative, _ in rows}, request, now
+    )
+    rows = sorted(
+        rows,
+        key=lambda pair: (
+            pair[1].is_house_ad,
+            -pair[1].priority,
+            _last_shown_sort_value(last_seen.get(pair[0].id)),
+            pair[0].id,
+        ),
+    )
     temporally_suppressed = _campaigns_in_cooldown(
         db, [campaign for _, campaign in rows], request, now
     )
