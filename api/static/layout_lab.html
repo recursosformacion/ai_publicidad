@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Laboratorio de composición · ai_publicidad</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#203044;background:#f2f5f8}*{box-sizing:border-box}body{margin:0}header{padding:22px 28px;background:#172b43;color:white}header h1{margin:0 0 5px;font-size:26px}header p{margin:0;color:#d6e1ec}main{max-width:1400px;margin:auto;padding:20px;display:grid;grid-template-columns:300px minmax(0,1fr);gap:18px}.card{background:white;border:1px solid #dce4ec;border-radius:12px;overflow:hidden}.head{padding:14px 16px;border-bottom:1px solid #dce4ec}.head h2{margin:0;font-size:17px}.head p{margin:4px 0 0;color:#63758a;font-size:13px}.inside{padding:15px}.notice{padding:12px 15px;background:#fff6dd;border:1px solid #e7d3a5;border-radius:9px;color:#684711;margin-bottom:16px;grid-column:1/-1}.scenarios{display:grid;gap:8px}.scenario{display:flex;justify-content:space-between;gap:8px;align-items:center}.scenario button{flex:1}.scenario span{font-size:12px;color:#63758a;white-space:nowrap}button{font:inherit;cursor:pointer;border:1px solid #c7d3df;background:#fff;border-radius:8px;padding:9px 10px;color:#203044;text-align:left}button:hover{background:#f4f9ff;border-color:#80a8cf}.primary{background:#2367a8;border-color:#2367a8;color:white;text-align:center}.field{display:grid;gap:4px;margin-bottom:11px}.field label{font-size:13px;font-weight:650}.field input,.field select{width:100%;padding:9px;border:1px solid #c7d3df;border-radius:7px;background:white;font:inherit}.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}.divider{border:0;border-top:1px solid #dce4ec;margin:17px 0}.result{padding:16px}.result h2{margin:0 0 4px;font-size:18px}.muted{color:#63758a;font-size:13px}.chips{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.chip{padding:4px 8px;border:1px solid #dce4ec;border-radius:7px;background:#f8fafc;font-size:12px}.preview{border:1px solid #dce4ec;background:#e8edf3;border-radius:8px;padding:10px;overflow:auto;min-height:70px}.preview iframe{display:block;border:0;max-width:none}.status{font-size:12px;font-weight:700;padding:4px 8px;border-radius:20px;background:#e8f5ec;color:#206b49}.history{display:grid;gap:8px;margin-top:12px}.history-item{background:white;border:1px solid #dce4ec;border-radius:9px;padding:10px 13px}.history-item strong{display:block}.error{color:#a62d35}.history-item small{color:#63758a}@media(max-width:820px){main{grid-template-columns:1fr}} 
+</style>
+</head>
+<body>
+<header><h1>Laboratorio de composición publicitaria</h1><p>Solicita un hueco por tamaño y zona. El servicio calcula las posiciones y devuelve el HTML listo para mostrar.</p></header>
+<main>
+<div class="notice"><strong>Solo desarrollo local.</strong> Cada petición que devuelve anuncios crea una entrega y contabiliza inmediatamente una impresión por cada anuncio del HTML. Las peticiones de este laboratorio usan la página de prueba <code>ad_layout_lab</code>; no se registra una composición separada.</div>
+<aside class="card">
+<div class="head"><h2>Escenarios habituales</h2><p>Pulsa uno para pedir ese espacio al algoritmo.</p></div>
+<div class="inside">
+<div class="scenarios">
+<div class="scenario"><button type="button" data-case="desktop">Cabecera escritorio</button><span>728×90</span></div>
+<div class="scenario"><button type="button" data-case="mobile">Cabecera móvil</button><span>320×50</span></div>
+<div class="scenario"><button type="button" data-case="wide">Contenido ancho</button><span>640×320</span></div>
+<div class="scenario"><button type="button" data-case="tall">Espacio alto</button><span>300×600</span></div>
+<div class="scenario"><button type="button" data-case="inline">Contenido bajo</button><span>640×240</span></div>
+<div class="scenario"><button type="button" data-case="vertical">Columna estrecha</button><span>160×600</span></div>
+<div class="scenario"><button type="button" data-case="small">Hueco pequeño</button><span>140×80</span></div>
+</div>
+<button class="primary" id="all" type="button" style="width:100%;margin-top:12px">Ejecutar todos (registra impresiones)</button>
+<hr class="divider">
+<h2 style="font-size:17px;margin:0 0 12px">Espacio personalizado</h2>
+<form id="custom">
+<div class="two">
+<div class="field"><label for="w">Ancho (CSS px)</label><input id="w" type="number" min="1" max="2000" value="640" required></div>
+<div class="field"><label for="h">Alto (CSS px)</label><input id="h" type="number" min="1" max="1200" value="320" required></div>
+</div>
+<div class="field"><label for="zone">Zona del anuncio</label><select id="zone"><option value="layout_lab">Laboratorio (todos los formatos)</option><option value="header">Cabecera</option><option value="content_top">Inicio del contenido</option><option value="sidebar">Columna lateral</option><option value="content_inline">Dentro del contenido</option></select></div>
+<div class="field"><label for="device">Dispositivo</label><select id="device"><option value="desktop">Escritorio</option><option value="mobile">Móvil</option><option value="tablet">Tableta</option></select></div>
+<div class="field"><label for="count">Máximo de anuncios</label><select id="count"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option></select></div>
+<div class="two">
+<div class="field"><label for="gap">Separación (px)</label><select id="gap"><option>0</option><option>8</option><option selected>12</option><option>16</option><option>24</option></select></div>
+<div class="field"><label for="orientation">Distribución</label><select id="orientation"><option value="auto">Automática</option><option value="row">En fila</option><option value="column">En columna</option></select></div>
+</div>
+<button class="primary" type="submit" style="width:100%">Solicitar composición</button>
+</form>
+</div>
+</aside>
+<section>
+<div class="card">
+<div class="head"><h2>Resultado del algoritmo</h2><p id="subtitle">Elige un escenario para empezar.</p></div>
+<div class="result"><div><span class="status" id="status">Esperando petición</span></div><div class="chips" id="chips"></div><div class="preview" id="preview">Aquí se verá el HTML devuelto por el servicio.</div><p class="muted" id="message"></p></div>
+</div>
+<div class="history" id="history"></div>
+</section>
+</main>
+<script>
+(function(){
+"use strict";
+var count=0;
+var cases={
+ desktop:{title:"Cabecera escritorio",mode:"fixed_format",format_code:"leaderboard_728x90",placement:"header",device:"desktop",width:728,height:90,max_ads:1,gap:0,orientation:"auto"},
+ mobile:{title:"Cabecera móvil",mode:"fixed_format",format_code:"mobile_banner_320x50",placement:"header",device:"mobile",width:320,height:50,max_ads:1,gap:0,orientation:"auto"},
+ wide:{title:"Contenido ancho",mode:"auto_area",placement:"layout_lab",device:"desktop",width:640,height:320,max_ads:3,gap:12,orientation:"auto"},
+ tall:{title:"Espacio alto",mode:"auto_area",placement:"layout_lab",device:"desktop",width:300,height:600,max_ads:3,gap:12,orientation:"auto"},
+ inline:{title:"Contenido bajo",mode:"auto_area",placement:"layout_lab",device:"desktop",width:640,height:240,max_ads:3,gap:12,orientation:"auto"},
+ vertical:{title:"Columna estrecha",mode:"fixed_format",format_code:"wide_skyscraper_160x600",placement:"sidebar",device:"desktop",width:160,height:600,max_ads:1,gap:0,orientation:"auto"},
+ small:{title:"Hueco pequeño",mode:"auto_area",placement:"layout_lab",device:"mobile",width:140,height:80,max_ads:3,gap:8,orientation:"auto"}
+};
+function el(id){return document.getElementById(id);}
+function chip(text){var node=document.createElement("span");node.className="chip";node.textContent=text;return node;}
+function payload(spec){
+ count+=1;
+ var out={application:"osap",page:{type:"ad_layout_lab",entity_type:"layout_test",entity_id:String(count),language:"es"},placement:spec.placement,device:spec.device,mode:spec.mode,max_ads:spec.max_ads,gap:spec.gap,orientation:spec.orientation};
+ if(spec.mode==="fixed_format"){out.format_code=spec.format_code;}else{out.area={width:spec.width,height:spec.height};}
+ return out;
+}
+function show(spec,markup){
+ var parsed=new DOMParser().parseFromString(markup,"text/html");
+ var root=parsed.querySelector(".ap-layout");
+ el("subtitle").textContent=spec.title+" · zona "+spec.placement;
+ el("status").textContent=root&&root.dataset.layoutStatus==="ok"?"Composición generada":"Sin anuncios compatibles";
+ el("chips").replaceChildren();
+ el("chips").append(chip("Hueco: "+spec.width+"×"+spec.height+" px"));
+ el("chips").append(chip("Zona: "+spec.placement));
+ var n=root&&root.dataset.layoutStatus==="ok"?Number(root.dataset.adCount||0):0;
+ if(n){
+  el("chips").append(chip("Distribución: "+root.dataset.layout));
+  el("chips").append(chip("Anuncios: "+n));
+  el("chips").append(chip("Área ocupada: "+root.dataset.layoutWidth+"×"+root.dataset.layoutHeight+" px"));
+  el("chips").append(chip("Impresiones registradas ahora: "+n));
+  el("message").textContent="La respuesta es HTML listo para incluir. Se contabilizó una impresión por anuncio al emitir este bloque; no se necesita otro endpoint de impresión.";
+ }else{
+  el("chips").append(chip("Anuncios: 0"));
+  el("message").textContent="El servicio no encontró un formato que quepa. No se registraron impresiones.";
+ }
+ if(root){
+  var frame=document.createElement("iframe");
+  frame.title="HTML devuelto para "+spec.title;
+  frame.width=String(spec.width);frame.height=String(spec.height);
+  frame.setAttribute("sandbox","allow-popups allow-popups-to-escape-sandbox");
+  frame.srcdoc='<!doctype html><html lang="es"><head><meta charset="utf-8"><style>html,body{margin:0;padding:0}*{box-sizing:border-box}</style></head><body>'+markup+'</body></html>';
+  el("preview").replaceChildren(frame);
+ }
+ var item=document.createElement("div");item.className="history-item";
+ var strong=document.createElement("strong");strong.textContent=spec.title+" · "+(n?n+" anuncio(s)":"sin anuncios");
+ var small=document.createElement("small");small.textContent=spec.width+"×"+spec.height+" px · "+spec.placement+(n?" · "+n+" impresiones contabilizadas":"");
+ item.append(strong,small);el("history").prepend(item);
+}
+async function run(spec){
+ el("status").textContent="Solicitando…";el("subtitle").textContent=spec.title;el("message").textContent="";
+ try{
+  var response=await fetch("/api/v1/ads/compose",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload(spec))});
+  var body=await response.text();
+  if(!response.ok)throw new Error("HTTP "+response.status+": "+body.slice(0,250));
+  show(spec,body);
+ }catch(error){
+  el("status").textContent="Error";el("status").className="status error";
+  el("preview").replaceChildren();
+  var p=document.createElement("p");p.className="error";p.textContent=String(error);el("preview").append(p);
+  el("message").textContent="Comprueba que el servicio esté iniciado, que la migración esté aplicada y que la campaña de anuncios exista.";
+ }
+}
+document.querySelectorAll("[data-case]").forEach(function(button){button.addEventListener("click",function(){run(cases[button.dataset.case]);});});
+el("all").addEventListener("click",async function(){for(var key of Object.keys(cases)){await run(cases[key]);}});
+el("custom").addEventListener("submit",function(event){
+ event.preventDefault();
+ var spec={title:"Espacio personalizado",mode:"auto_area",placement:el("zone").value,device:el("device").value,width:Number(el("w").value),height:Number(el("h").value),max_ads:Number(el("count").value),gap:Number(el("gap").value),orientation:el("orientation").value};
+ if(!Number.isInteger(spec.width)||!Number.isInteger(spec.height)||spec.width<1||spec.width>2000||spec.height<1||spec.height>1200){el("message").textContent="El ancho máximo es 2000 px y el alto máximo es 1200 px.";return;}
+ spec.title="Espacio personalizado "+spec.width+"×"+spec.height;
+ run(spec);
+});
+})();
+</script>
+</body>
+</html>
