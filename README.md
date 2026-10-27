@@ -86,7 +86,7 @@ Un anuncio puede asociarse a varios formatos estándar. El banner institucional 
 
 ## Motor de composición automática
 
-Además de `POST /api/v1/ads/serve` (una creatividad en JSON), el servicio ofrece `POST /api/v1/ads/compose`, que devuelve un fragmento **HTML listo para insertar**. El consumidor puede pedir un formato concreto, indicar un `creative_id` (sin saltarse las reglas de elegibilidad), o reservar un área y permitir que el servicio decida una composición de hasta tres anuncios.
+Además de `POST /api/v1/ads/serve` (una creatividad en JSON), el servicio ofrece `POST /api/v1/ads/compose`, que devuelve un fragmento **HTML listo para insertar**. El consumidor puede pedir un formato concreto, indicar un `creative_id` (sin saltarse las reglas de elegibilidad), o reservar un área y permitir que el servicio decida una composición de hasta tres anuncios. Cuando se solicita un `creative_id`, solo se entrega esa creatividad y como máximo una pieza.
 
 El orden del algoritmo es deliberado: primero selecciona el conjunto comercialmente elegible por estado, fechas, segmentación, idioma, marca activa y tiempo mínimo de repetición; solo después calcula la geometría. Entre los tamaños que caben, intenta primero el de mayor superficie y baja a otro menor si no puede colocar ninguno del tamaño anterior. Una composición nunca mezcla medidas: todas las piezas comparten exactamente ancho y alto. Se organizan en fila o columna y se descartan las combinaciones que exceden el área.
 
