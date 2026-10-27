@@ -40,7 +40,7 @@ Cada campaña puede definir `minimum_interval_seconds`. Si vale cero, no impone 
 
 Esto permite no repetir continuamente una creatividad para el mismo hueco de una ficha o pantalla, manteniendo la selección independiente entre ubicaciones o entidades distintas. Se consulta `ad_deliveries`, por lo que no requiere una tabla nueva de composición.
 
-**No es un límite por persona:** actualmente no identificamos visitantes ni guardamos un identificador persistente de usuario. El intervalo es por contexto de página/entidad/ubicación, no una garantía de frecuencia por usuario. Para implementar límites por visitante en el futuro haría falta definir un identificador de ranura/sesión respetuoso con la privacidad.
+**La frecuencia por visitante ya está implementada como opción configurable:** las campañas pueden fijar un máximo de impresiones por visitante y/o un intervalo mínimo entre entregas. La solicitud debe incluir un identificador opaco de primera parte; se almacena solo su HMAC-SHA256. No deben enviarse correos, IDs de cuenta, IP ni datos personales. Sin identificador, una campaña que exija el control no es elegible. Consulta [Control comercial de entregas](commercial-delivery-controls.md).
 
 Las fechas de campaña (`starts_at` y `ends_at`) y este intervalo son reglas distintas: las primeras definen cuándo está autorizada la campaña; el segundo regula cuándo puede repetirse en el mismo contexto.
 
@@ -182,17 +182,11 @@ python -m uvicorn api.main:app --host 127.0.0.1 --port 8305
 
 Después abre `http://127.0.0.1:8305/layout-lab`. El seed es idempotente. Las solicitudes del laboratorio usan la página `ad_layout_lab` y la ubicación `layout_lab`.
 
-## 7. Límites de negocio aún pendientes
+## 7. Controles comerciales y límites pendientes
 
-Esta versión ya aplica estado, fechas, prioridades, reglas de ubicación/segmentación, marca activa, incompatibilidad entre marcas e intervalo de repetición. Todavía no se han construido:
+El motor aplica estado y fechas, segmentación, marca activa/competidora, intervalo entre entregas en el mismo contexto, estado/vigencia del pedido y del anunciante, presupuestos totales/diarios CPM/CPC, pacing y topes de impresiones/clics por pedido o campaña. También admite frecuencia por visitante mediante HMAC y reserva temporalmente el coste previsto de entregas CPM todavía sin confirmar. Todos estos controles se ejecutan **antes** de entrar al algoritmo geométrico. Los campos, endpoints, unidades monetarias y privacidad están documentados en [Control comercial de entregas](commercial-delivery-controls.md).
 
-- presupuestos monetarios, contratos y pedidos;
-- límites máximos de impresiones/clics por día o campaña;
-- frecuencia por visitante;
-- pacing o reparto automático de un presupuesto a lo largo de una campaña;
-- un registro histórico de razones de selección.
-
-No se debe simular que esas restricciones existen. Antes de añadirlas, se definirán sus campos comerciales en el modelo y se aplicarán al filtro de elegibilidad **antes** de entrar al algoritmo geométrico.
+Siguen pendientes la autorización administrativa, el modelo de placements como entidad propia, informes contables/facturación fiscal, pagos, antifraude avanzado y pruebas de carga con múltiples procesos sobre MySQL. La selección ya tiene tests automatizados, pero los límites económicos deben validarse con pruebas de concurrencia antes de usarse como garantía contable.
 
 ## 8. Pruebas de aceptación
 
