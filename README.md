@@ -84,6 +84,43 @@ Los tamaños se catalogan en `ad_formats`, separados del tipo de creatividad. El
 
 Un anuncio puede asociarse a varios formatos estándar. El banner institucional de OpenMusicRepository se asocia a los dos tamaños de cabecera: escritorio y móvil. Cuando se solicitan dimensiones, la entrega prioriza un anuncio asignado exactamente a ese tamaño y dispositivo; si no lo hay, puede usar una creatividad genérica compatible como reserva, pero no un anuncio fijo de dimensiones distintas. Los clientes deben enviar `width` y `height` juntos; sin dimensiones, solo se entregan creatividades genéricas no asociadas a tamaños fijos.
 
+## 5. Composición automática del espacio
+
+Además de `POST /api/v1/ads/serve` (una creatividad en JSON), el servicio ofrece `POST /api/v1/ads/compose`, que devuelve un fragmento **HTML listo para insertar**. La petición puede fijar un formato del catálogo o especificar el área disponible, la ubicación, el dispositivo, el número máximo de anuncios (1–3), la separación y la orientación. El algoritmo actual evalúa composiciones sencillas en fila o columna, comprueba que cada tarjeta cabe y no repite una creatividad en el mismo bloque.
+
+Ejemplo de petición automática:
+
+```json
+{
+  "application": "osap",
+  "page": {
+    "type": "ad_layout_lab",
+    "entity_type": "layout_test",
+    "entity_id": "test-640x320",
+    "language": "es"
+  },
+  "placement": "layout_lab",
+  "device": "desktop",
+  "mode": "auto_area",
+  "area": { "width": 640, "height": 320 },
+  "max_ads": 3,
+  "gap": 12,
+  "orientation": "auto"
+}
+```
+
+La respuesta es HTML con coordenadas por tarjeta, medidas, formato y enlaces `/r/{token}`. El servicio escapa los campos de texto y genera las tarjetas desde una plantilla controlada; no acepta HTML suministrado por las creatividades. No se persiste una composición independiente: solo se almacenan las entregas individuales.
+
+**Contabilización de vistas:** en `/ads/compose`, generar la respuesta HTML registra una entrega y una impresión inmediata por cada anuncio incluido. Así el consumidor no necesita una segunda petición por anuncio. Es una decisión deliberada del contrato simplificado: la métrica representa el bloque emitido, no una comprobación posterior de visibilidad en el viewport. El endpoint antiguo `/ads/serve` conserva su flujo separado de confirmación de impresión.
+
+### Laboratorio visual local
+
+Con el servicio arrancado en desarrollo, abre **http://127.0.0.1:8305/layout-lab**. El laboratorio solicita espacios predefinidos (728×90, 320×50, 640×320, 300×600, 640×240, 160×600 y 140×80), muestra el HTML real devuelto y permite enviar medidas personalizadas. Se necesita aplicar las migraciones y cargar la campaña OMR para ver esos formatos.
+
+Las solicitudes del laboratorio usan `page.type=ad_layout_lab`; las muestras de la campaña deben tener la regla de ubicación `layout_lab`. Para añadir esa regla a las creatividades iniciales, vuelve a ejecutar de forma idempotente `python scripts/seed_omr_campaign.py --apply` después de revisar la conexión.
+
+**El laboratorio crea impresiones reales en la base de datos de desarrollo.** Está deshabilitado en `AI_PUBLICIDAD_ENV=production`; no se debe desplegar públicamente. No registra composiciones separadas ni ofrece un endpoint de previsualización sin efectos secundarios.
+
 ## 5. Selección de anuncios
 
 La petición podrá incluir:
@@ -294,6 +331,8 @@ Si trabajas desde cero, instala también las dependencias de desarrollo (`python
 - Aplicación FastAPI y `GET /health`.
 - Catálogo provisional en `GET /api/v1/metadata/page-types`.
 - `POST /api/v1/ads/serve`: selecciona creatividades aprobadas, prioriza campañas comerciales y usa anuncios propios como reserva; permite reglas de inclusión/exclusión por aplicación, página, espacio, idioma y entidad.
+- `POST /api/v1/ads/compose`: devuelve HTML seguro para un espacio fijo o área disponible, calcula una composición de hasta tres anuncios y registra entrega/impresión por pieza en la misma transacción.
+- Laboratorio visual local en `/layout-lab` (solo desarrollo), con escenarios reales y medidas personalizadas.
 - `POST /api/v1/events/impression`: confirma la impresión con protección de idempotencia.
 - `GET /r/{token}`: registra el clic y redirige al destino almacenado en la creatividad, nunca a una URL recibida en la petición.
 - Modelos SQLAlchemy y primera migración Alembic; esquema local automático solo en desarrollo/pruebas.
