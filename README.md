@@ -154,7 +154,7 @@ La petición podrá incluir:
 
 Se seleccionan anuncios cuya campaña esté activa y dentro de sus fechas, cuyo material esté aprobado y que coincida con aplicación, página, ubicación, formato e idioma configurados. Las reglas de inclusión/exclusión se aplican antes de la optimización del espacio. La prioridad de campaña ordena los anuncios elegibles del tamaño escogido.
 
-Las campañas también admiten `minimum_interval_seconds`. Si es mayor que cero, una entrega reciente en la misma aplicación, tipo de página, entidad y ubicación hace que esa campaña se omita temporalmente para ese contexto. No equivale a un límite por usuario: no hay identificador de visitante. Las restricciones aplicadas actualmente son estado, fechas, targeting, marca activa, formato/dispositivo, prioridad e intervalo temporal.
+Las campañas también admiten `minimum_interval_seconds`. Si es mayor que cero, una entrega reciente en la misma aplicación, tipo de página, entidad y ubicación hace que esa campaña se omita temporalmente para ese contexto. No equivale a un límite por usuario: no hay identificador de visitante. Entre alternativas de igual prioridad también se prefiere la creatividad que lleva más tiempo sin mostrarse en ese contexto (histórico de rotación de hasta 30 días). Las restricciones aplicadas actualmente son estado, fechas, targeting, marca activa, formato/dispositivo, prioridad, cooldown e intervalo de rotación.
 
 **Todavía no están implementados** presupuestos, contratos, límites diarios/totales de impresiones, límites de clics ni pacing. Se añadirán como restricciones comerciales previas al cálculo geométrico, no como puntuaciones que puedan saltarse una condición de elegibilidad.
 
