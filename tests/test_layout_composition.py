@@ -1,10 +1,26 @@
 """Integration tests for bounded HTML composition and immediate view accounting."""
 
+from html.parser import HTMLParser
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from api.main import app
-from domain.models import AdDelivery, AdEvent, Campaign, Creative
+from domain.models import AdDelivery, AdEvent
+
+
+class _AdHtmlParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.root: dict[str, str | None] | None = None
+        self.cards: list[dict[str, str | None]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        if tag == "div" and "ap-layout" in (values.get("class") or "").split():
+            self.root = values
+        if tag == "a" and "ap-ad-card" in (values.get("class") or "").split():
+            self.cards.append(values)
 
 
 def _make_format(client, code: str, width: int, height: int, category: str) -> int:
@@ -115,10 +131,9 @@ def test_composer_returns_html_for_best_bounded_combination_and_counts_each_view
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
-    from bs4 import BeautifulSoup
-
-    soup = BeautifulSoup(response.text, "html.parser")
-    root = soup.select_one(".ap-layout")
+    parser = _AdHtmlParser()
+    parser.feed(response.text)
+    root = parser.root
     assert root is not None
     assert root["data-layout-status"] == "ok"
     assert root["data-layout"] == "row"
@@ -126,17 +141,17 @@ def test_composer_returns_html_for_best_bounded_combination_and_counts_each_view
     assert root["data-area-width"] == "640"
     assert root["data-area-height"] == "320"
 
-    cards = soup.select("a.ap-ad-card")
+    cards = parser.cards
     assert len(cards) == 2
-    selected_creatives = {int(card["data-ad-id"]) for card in cards}
+    selected_creatives = {int(card["data-ad-id"] or 0) for card in cards}
     assert selected_creatives == {creative_ids["rectangle"], creative_ids["square"]}
     for card in cards:
-        x, y = int(card["data-x"]), int(card["data-y"])
-        width, height = int(card["data-width"]), int(card["data-height"])
+        x, y = int(card["data-x"] or 0), int(card["data-y"] or 0)
+        width, height = int(card["data-width"] or 0), int(card["data-height"] or 0)
         assert x >= 0 and y >= 0
         assert x + width <= 640
         assert y + height <= 320
-        assert "/r/" in card["href"]
+        assert "/r/" in (card["href"] or "")
         assert card.get("data-impression-id")
 
     with Session(test_engine) as db:
@@ -170,12 +185,11 @@ def test_fixed_format_returns_exactly_one_ad_and_counts_its_view(client, test_en
         },
     )
     assert response.status_code == 200
-    from bs4 import BeautifulSoup
-
-    soup = BeautifulSoup(response.text, "html.parser")
-    cards = soup.select("a.ap-ad-card")
+    parser = _AdHtmlParser()
+    parser.feed(response.text)
+    cards = parser.cards
     assert len(cards) == 1
-    assert int(cards[0]["data-ad-id"]) == creative_ids["rectangle"]
+    assert int(cards[0]["data-ad-id"] or 0) == creative_ids["rectangle"]
     assert cards[0]["data-width"] == "300"
     assert cards[0]["data-height"] == "250"
 
