@@ -186,7 +186,7 @@ def seed_omr_campaign(db: Session) -> bool:
                 assigned_ids.add(ad_format.id)
                 changed = True
 
-        expected_rules = (("application", "osap"), ("placement", seed["placement"]))
+        expected_rules = (("application", "osap"), ("placement", seed["placement"]), ("placement", "layout_lab"))
         for rule_type, rule_value in expected_rules:
             existing = db.scalar(
                 select(TargetingRule).where(
