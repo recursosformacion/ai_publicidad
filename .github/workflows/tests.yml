@@ -31,10 +31,13 @@ jobs:
           AI_PUBLICIDAD_ENV: test
           AI_PUBLICIDAD_DATABASE_URL: sqlite:///./migration-check.sqlite3
         run: python -m alembic upgrade head
-      - name: Check administration panel JavaScript syntax
+      - name: Check web interface JavaScript syntax
         run: |
-          python -c "from pathlib import Path; import re; html=Path('api/static/admin.html').read_text(encoding='utf-8'); match=re.search(r'<script>(.*?)</script>', html, re.S); assert match, 'script block missing'; Path('/tmp/ai_publicidad_admin.js').write_text(match.group(1), encoding='utf-8')"
+          python -c "from pathlib import Path; import re; \
+          names=('admin.html','layout_lab.html'); \
+          [(lambda p: Path('/tmp/ai_publicidad_'+p.stem+'.js').write_text(re.search(r'<script>(.*?)</script>', p.read_text(encoding='utf-8'), re.S).group(1), encoding='utf-8'))(Path('api/static')/name) for name in names]"
           node --check /tmp/ai_publicidad_admin.js
+          node --check /tmp/ai_publicidad_layout_lab.js
       - name: Check database provisioning command starts correctly
         run: python scripts/create_database.py --help
       - name: Check house-ad seed command starts correctly
