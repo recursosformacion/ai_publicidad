@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from api.schemas import AdArea, AdPayload, ComposeAdRequest, FormatRequest, ServeAdRequest
 from application.security import require_service_token, validate_destination
+from application.commercial import campaign_business_eligible, charge_microcents_for_event, visitor_key_hash
 from domain.models import (
     AdDelivery,
     AdEvent,
@@ -34,9 +35,9 @@ def _campaign_is_current(campaign: Campaign, now: datetime) -> bool:
         return False
     starts = campaign.starts_at
     ends = campaign.ends_at
-    if starts and starts.replace(tzinfo=timezone.utc) > now:
+    if starts and (starts.replace(tzinfo=timezone.utc) if starts.tzinfo is None else starts.astimezone(timezone.utc)) > now:
         return False
-    if ends and ends.replace(tzinfo=timezone.utc) < now:
+    if ends and (ends.replace(tzinfo=timezone.utc) if ends.tzinfo is None else ends.astimezone(timezone.utc)) < now:
         return False
     return True
 
@@ -110,6 +111,7 @@ def _compose_context(request: ComposeAdRequest) -> ServeAdRequest:
         placement=request.placement,
         format=FormatRequest(type="responsive"),
         device=request.device,
+        visitor_id=request.visitor_id,
     )
 
 
@@ -250,9 +252,14 @@ def _compose_options(
         db, {creative.id for creative, _ in rows}, request, now
     )
     options: list[_AdOption] = []
+    business_eligibility: dict[int, bool] = {}
 
     for creative, campaign in rows:
         if not _campaign_is_current(campaign, now):
+            continue
+        if campaign.id not in business_eligibility:
+            business_eligibility[campaign.id] = campaign_business_eligible(db, campaign, request.visitor_id, now)
+        if not business_eligibility[campaign.id]:
             continue
         if campaign.id in temporally_suppressed:
             continue
@@ -341,7 +348,10 @@ def _brands_are_compatible(items: tuple[_AdOption, ...], competitor_pairs: set[f
         if frozenset((left, right)) in competitor_pairs:
             return False
     campaign_ids = [item.campaign.id for item in items]
-    return len(set(campaign_ids)) == len(campaign_ids)
+    if len(set(campaign_ids)) != len(campaign_ids):
+        return False
+    order_ids = [item.campaign.order_id for item in items if item.campaign.order_id is not None]
+    return len(set(order_ids)) == len(order_ids)
 
 
 def _choose_layout(
@@ -472,6 +482,7 @@ def _render_layout_html(
             placement=request.placement,
             language=request.page.language,
             ad_format_id=option.ad_format.id,
+            visitor_key_hash=visitor_key_hash(request.visitor_id),
             impression_confirmed=True,
             impression_confirmed_at=now,
         )
@@ -483,6 +494,7 @@ def _render_layout_html(
                 event_type="impression",
                 occurred_at=now,
                 deduplication_key=f"impression:{delivery.id}",
+                charge_microcents=charge_microcents_for_event(db, option.campaign, "impression"),
             )
         )
         deliveries.append(delivery)
@@ -665,6 +677,8 @@ def serve_ad(request: ServeAdRequest, db: Session = Depends(get_db)) -> AdPayloa
             for creative, campaign in rows:
                 if campaign.is_house_ad != house_pass or not _campaign_is_current(campaign, now):
                     continue
+                if not campaign_business_eligible(db, campaign, request.visitor_id, now):
+                    continue
                 if campaign.id in temporally_suppressed:
                     continue
                 if campaign.brand_id is not None and campaign.brand_id not in active_brands:
@@ -732,6 +746,7 @@ def serve_ad(request: ServeAdRequest, db: Session = Depends(get_db)) -> AdPayloa
         placement=request.placement,
         language=request.page.language,
         ad_format_id=matched_format.id if matched_format is not None else None,
+        visitor_key_hash=visitor_key_hash(request.visitor_id),
     )
     db.add(delivery)
     db.commit()
