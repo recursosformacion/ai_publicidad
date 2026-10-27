@@ -248,3 +248,137 @@ def test_layout_lab_is_local_only_and_page_is_packaged(client, monkeypatch):
     )
     allowed_mysql = client.get("/layout-lab")
     assert allowed_mysql.status_code == 200
+
+def _create_brand(client, name: str) -> int:
+    response = client.post(
+        "/api/v1/admin/brands",
+        json={
+            "name": name,
+            "website_url": "https://example.org/",
+            "notes": None,
+            "is_active": True,
+            "competitor_brand_ids": [],
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+def _add_brand_campaign_ad(
+    client,
+    *,
+    name: str,
+    brand_id: int,
+    format_id: int,
+    priority: int,
+    minimum_interval_seconds: int = 0,
+    is_house_ad: bool = False,
+) -> tuple[int, int]:
+    campaign = client.post(
+        "/api/v1/admin/campaigns",
+        json={
+            "name": name,
+            "status": "active",
+            "starts_at": None,
+            "ends_at": None,
+            "priority": priority,
+            "is_house_ad": is_house_ad,
+            "brand_id": brand_id,
+            "minimum_interval_seconds": minimum_interval_seconds,
+        },
+    )
+    assert campaign.status_code == 201, campaign.text
+    campaign_id = campaign.json()["id"]
+    creative_id = _make_creative(client, campaign_id, f"Ad {name}", format_id)
+    return campaign_id, creative_id
+
+
+def test_competitor_brands_are_not_composed_together(client, test_engine):
+    fmt = _make_format(client, "brand_test_300x250", 300, 250, "rectangle")
+    brand_a = _create_brand(client, "Competitor Alpha")
+    brand_b = _create_brand(client, "Competitor Beta")
+    brand_c = _create_brand(client, "Independent Gamma")
+
+    response = client.put(
+        f"/api/v1/admin/brands/{brand_a}",
+        json={
+            "name": "Competitor Alpha",
+            "website_url": "https://alpha.example/",
+            "notes": "Competidor de Beta",
+            "is_active": True,
+            "competitor_brand_ids": [brand_b],
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["competitor_brand_ids"] == [brand_b]
+    beta = client.get(f"/api/v1/admin/brands/{brand_b}")
+    assert beta.status_code == 200
+    assert beta.json()["competitor_brand_ids"] == [brand_a]
+
+    _, creative_a = _add_brand_campaign_ad(
+        client, name="Alpha campaign", brand_id=brand_a, format_id=fmt, priority=100
+    )
+    _, creative_b = _add_brand_campaign_ad(
+        client, name="Beta campaign", brand_id=brand_b, format_id=fmt, priority=95
+    )
+    _, creative_c = _add_brand_campaign_ad(
+        client, name="Gamma campaign", brand_id=brand_c, format_id=fmt, priority=90
+    )
+
+    response = client.post("/api/v1/ads/compose", json=_compose_payload(640, 320))
+    assert response.status_code == 200, response.text
+    parser = _AdHtmlParser()
+    parser.feed(response.text)
+    selected = {int(card["data-ad-id"] or 0) for card in parser.cards}
+    assert selected == {creative_a, creative_c}
+    assert creative_b not in selected
+    assert parser.root is not None and parser.root["data-ad-count"] == "2"
+
+
+def test_campaign_cooldown_uses_house_fallback_for_same_slot(client, test_engine):
+    fmt = _make_format(client, "cooldown_test_300x250", 300, 250, "rectangle")
+    brand = _create_brand(client, "Timed Advertiser")
+    _, commercial_id = _add_brand_campaign_ad(
+        client,
+        name="Timed commercial campaign",
+        brand_id=brand,
+        format_id=fmt,
+        priority=100,
+        minimum_interval_seconds=3600,
+    )
+    house_campaign = client.post(
+        "/api/v1/admin/campaigns",
+        json={
+            "name": "Cooldown house fallback",
+            "status": "active",
+            "starts_at": None,
+            "ends_at": None,
+            "priority": -10,
+            "is_house_ad": True,
+        },
+    )
+    assert house_campaign.status_code == 201, house_campaign.text
+    house_id = _make_creative(client, house_campaign.json()["id"], "House fallback", fmt)
+
+    payload = _compose_payload(640, 320)
+    payload["page"]["entity_id"] = "same-page-slot"
+    first = client.post("/api/v1/ads/compose", json=payload)
+    assert first.status_code == 200
+    first_parser = _AdHtmlParser()
+    first_parser.feed(first.text)
+    assert len(first_parser.cards) == 1
+    assert int(first_parser.cards[0]["data-ad-id"] or 0) == commercial_id
+    assert first_parser.cards[0]["data-kind"] == "commercial"
+
+    second = client.post("/api/v1/ads/compose", json=payload)
+    assert second.status_code == 200
+    second_parser = _AdHtmlParser()
+    second_parser.feed(second.text)
+    assert len(second_parser.cards) == 1
+    assert int(second_parser.cards[0]["data-ad-id"] or 0) == house_id
+    assert second_parser.cards[0]["data-kind"] == "house"
+
+    with Session(test_engine) as db:
+        assert db.query(AdDelivery).count() == 2
+        assert db.query(AdEvent).count() == 2
+
