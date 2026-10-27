@@ -23,6 +23,7 @@ from domain.models import (
     AdDelivery,
     AdEvent,
     AdFormat,
+    AdOrder,
     Brand,
     Campaign,
     Creative,
@@ -314,9 +315,15 @@ def _validate_campaign_brand(db: Session, brand_id: int | None) -> None:
         raise HTTPException(status_code=404, detail=f"Marca {brand_id} no existe")
 
 
+def _validate_campaign_order(db: Session, order_id: int | None) -> None:
+    if order_id is not None and db.get(AdOrder, order_id) is None:
+        raise HTTPException(status_code=404, detail=f"Pedido/contrato {order_id} no existe")
+
+
 @router.post("/campaigns", response_model=CampaignRead, status_code=status.HTTP_201_CREATED)
 def create_campaign(payload: CampaignInput, db: Session = Depends(get_db)) -> Campaign:
     _validate_campaign_brand(db, payload.brand_id)
+    _validate_campaign_order(db, payload.order_id)
     campaign = Campaign(**payload.model_dump())
     db.add(campaign)
     db.commit()
@@ -340,6 +347,7 @@ def replace_campaign(
     if campaign is None:
         raise _not_found("Campaña", campaign_id)
     _validate_campaign_brand(db, payload.brand_id)
+    _validate_campaign_order(db, payload.order_id)
     for key, value in payload.model_dump().items():
         setattr(campaign, key, value)
     db.commit()
