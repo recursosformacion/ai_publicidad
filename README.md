@@ -115,7 +115,21 @@ La respuesta es HTML con coordenadas por tarjeta, medidas, formato y enlaces `/r
 
 ### Laboratorio visual local
 
-Con el servicio arrancado en desarrollo, abre **http://127.0.0.1:8305/layout-lab**. El laboratorio solicita espacios predefinidos (728×90, 320×50, 640×320, 300×600, 640×240, 160×600 y 140×80), muestra el HTML real devuelto y permite enviar medidas personalizadas. Se necesita aplicar las migraciones y cargar la campaña OMR para ver esos formatos.
+Para una prueba aislada en Windows/PowerShell, crea una base SQLite propia para el laboratorio (no apunta a `OSAP_PUBLICIDAD`):
+
+```powershell
+cd D:\Proyectos\AI_OSAP\ai_publicidad
+git pull origin main
+$env:AI_PUBLICIDAD_ENV = "development"
+$env:AI_PUBLICIDAD_DATABASE_URL = "sqlite:///./ai_publicidad_layout_lab.sqlite3"
+$env:AI_PUBLICIDAD_SERVICE_TOKEN = ""
+python -m pip install -e ".[dev]"
+python -m alembic upgrade head
+python scripts/seed_omr_campaign.py --apply --allow-sqlite
+python -m uvicorn api.main:app --host 127.0.0.1 --port 8305
+```
+
+Con ese servicio arrancado, abre **http://127.0.0.1:8305/layout-lab**. El laboratorio solicita espacios predefinidos (728×90, 320×50, 640×320, 300×600, 640×240, 160×600 y 140×80), muestra el HTML real devuelto y permite enviar medidas personalizadas. El script de carga crea los formatos y los anuncios de muestra, incluidos los permisos de ubicación `layout_lab`. Esta secuencia crea una base de pruebas aparte y no escribe en `OSAP_PUBLICIDAD`.
 
 Las solicitudes del laboratorio usan `page.type=ad_layout_lab`; las muestras de la campaña deben tener la regla de ubicación `layout_lab`. Para añadir esa regla a las creatividades iniciales, vuelve a ejecutar de forma idempotente `python scripts/seed_omr_campaign.py --apply` después de revisar la conexión.
 
