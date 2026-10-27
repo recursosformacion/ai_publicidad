@@ -44,6 +44,8 @@ Esto permite no repetir continuamente una creatividad para el mismo hueco de una
 
 Las fechas de campaña (`starts_at` y `ends_at`) y este intervalo son reglas distintas: las primeras definen cuándo está autorizada la campaña; el segundo regula cuándo puede repetirse en el mismo contexto.
 
+Entre creatividades comercialmente elegibles y de la misma prioridad, la última fecha de entrega se usa como desempate de rotación: se prefiere la que lleva más tiempo sin mostrarse en esa misma ubicación/entidad; una creatividad sin entregas recientes se considera la más antigua. La consulta de rotación está acotada a los últimos 30 días. El cooldown es una restricción dura de campaña; la antigüedad de la creatividad solo decide entre alternativas que siguen siendo elegibles.
+
 ### Fase C — elegir el tamaño, siempre homogéneo
 
 **Una composición nunca mezcla tamaños distintos.** Cada tarjeta del mismo bloque usa exactamente el mismo ancho y alto de catálogo. No se pone un rectángulo de 300×250 al lado de un cuadrado de 200×200 ni se estira uno para aparentar el otro.
