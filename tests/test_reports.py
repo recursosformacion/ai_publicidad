@@ -126,6 +126,13 @@ def test_report_summary_filters_campaign_and_computes_ctr(client, test_engine):
         "charge_microcents": 25_000_000,
     }]
 
+    creative_report = client.get(
+        "/api/v1/admin/reports/summary",
+        params={"start_date": today, "end_date": today, "campaign_id": campaign_id, "dimension": "creative"},
+    )
+    assert creative_report.status_code == 200
+    assert creative_report.json()["breakdown"][0]["label"] == "Creatividad de prueba"
+
 
 def test_report_can_separate_house_ads_and_export_csv(client, test_engine):
     _seed_report_data(test_engine)
