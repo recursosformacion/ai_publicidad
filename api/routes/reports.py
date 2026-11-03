@@ -288,6 +288,13 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
     }
 
 
+def _safe_csv_cell(value):
+    """Prevent spreadsheet formula execution from user-controlled labels."""
+    if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@", "\t", "\r")):
+        return "'" + value
+    return value
+
+
 def _parameters(start_date, end_date, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
                 application, page_type, placement, language, entity_type, entity_id, dimension):
     return dict(start_date=start_date, end_date=end_date, advertiser_id=advertiser_id,
@@ -354,7 +361,7 @@ def report_export_csv(
                      summary["charge_currency"] or "", summary["charge_microcents"] if summary["charge_microcents"] is not None else ""])
     for row in data["breakdown"]:
         ctr = round(row["clicks"] / row["impressions"] * 100, 4) if row["impressions"] else ""
-        writer.writerow(["desglose", "", data["dimension"], row["label"], row["deliveries"],
+        writer.writerow(["desglose", "", data["dimension"], _safe_csv_cell(row["label"]), row["deliveries"],
                          row["impressions"], row["clicks"], ctr, data["summary"]["charge_currency"] or "", row["charge_microcents"] if row["charge_microcents"] is not None else ""])
     for row in data["daily"]:
         ctr = round(row["clicks"] / row["impressions"] * 100, 4) if row["impressions"] else ""
@@ -365,5 +372,5 @@ def report_export_csv(
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"},
     )
