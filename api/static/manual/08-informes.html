@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>8. Informes y estadísticas · Manual OSAP</title><link rel="stylesheet" href="manual.css"></head><body>
+<header><small>OpenMusicRepository · ai_publicidad</small><h1>8. Informes y estadísticas</h1><p>Cómo convertir los registros publicitarios en información útil para OSAP y para el anunciante.</p></header>
+<div class="layout"><nav><b>Manual de explotación</b><div><a href="index.html">Inicio</a><a href="01-solicitud.html">1. Solicitud</a><a href="02-propuesta.html">2. Propuesta</a><a href="03-alta.html">3. Alta</a><a href="04-publicacion.html">4. Publicación</a><a href="05-seguimiento.html">5. Seguimiento</a><a href="06-resultados.html">6. Resultados</a><a href="07-limites.html">7. Glosario y límites</a><a href="08-informes.html" class="active">8. Informes</a><a href="09-gestion-economica.html" >9. Gestión económica</a></div></nav><main>
+<p>Este capítulo separa dos cosas que no deben confundirse: <b>los datos que el servicio ya registra</b> y <b>los informes que todavía habría que construir</b>. El panel actual permite consultar entregas y eventos individuales, pero no genera un cuadro de mando agregado ni informes descargables.</p>
+<div class="box warn"><b>Situación actual:</b> no hay que presentar este capítulo como una función ya disponible. Describe qué se puede calcular con el histórico existente y cómo debería organizarse una futura pantalla de informes, sin modificar ni reinterpretar los registros originales.</div>
+<h2>1. Qué información existe</h2>
+<table><tr><th>Dato</th><th>Origen</th><th>Uso</th></tr>
+<tr><td>Entrega</td><td><code>ad_deliveries</code></td><td>Una creatividad seleccionada y emitida en un contexto concreto.</td></tr>
+<tr><td>Impresión</td><td><code>ad_events</code>, evento <code>impression</code></td><td>Evento contabilizado según el modo de entrega.</td></tr>
+<tr><td>Clic</td><td><code>ad_events</code>, evento <code>click</code></td><td>Activación del enlace de seguimiento.</td></tr>
+<tr><td>Contexto</td><td><code>ad_deliveries</code></td><td>Aplicación, tipo de página, entidad, ubicación, idioma, formato y fecha.</td></tr>
+<tr><td>Relación comercial</td><td><code>ad_deliveries</code> → campaña → pedido → anunciante</td><td>Agrupar actividad por cliente y contrato.</td></tr>
+<tr><td>Cargo técnico</td><td><code>ad_events.charge_microcents</code></td><td>Control interno del consumo calculado en CPM/CPC.</td></tr></table>
+<p>La fecha del evento y la fecha de entrega son distintas: para contar actividad se usa la fecha del evento; para estudiar dónde/cuándo se sirvió una creatividad se usa la fecha de entrega. Un informe debe indicar qué fecha está utilizando.</p>
+<h2>2. Indicadores que pueden calcularse</h2>
+<ul>
+<li><b>Entregas:</b> número de filas de entrega en el periodo y ámbito seleccionados.</li>
+<li><b>Impresiones registradas:</b> número de eventos <code>impression</code>. En <code>/compose</code> se generan al emitir el HTML; en el flujo <code>/serve</code> se generan al confirmar la impresión.</li>
+<li><b>Clics registrados:</b> número de eventos <code>click</code> generados al pasar por <code>/r/{token}</code>. El sistema no deduplica los clics por persona; son activaciones registradas, no usuarios que han hecho clic.</li>
+<li><b>CTR:</b> clics registrados ÷ impresiones registradas × 100. Deben corresponder al mismo periodo y ámbito.</li>
+<li><b>Consumo técnico:</b> suma de cargos de eventos en microcéntimos, presentada solo como estimación/registro interno de consumo CPM/CPC, nunca como factura.</li>
+</ul>
+<div class="box"><b>Ejemplo ilustrativo:</b> 5.000 impresiones registradas y 35 clics registrados producen un CTR del 0,7 %. No significa que el 0,7 % de las personas haya comprado, ni que todas las impresiones fueran visibles.</div>
+<h2>3. Desgloses que tienen sentido</h2>
+<p>Los campos almacenados permiten preparar informes por:</p>
+<ul><li>Periodo (día, semana, mes o intervalo elegido).</li><li>Anunciante y pedido/contrato.</li><li>Campaña y creatividad.</li><li>Aplicación y tipo de página.</li><li>Ubicación publicitaria (<code>placement</code>).</li><li>Idioma y formato.</li><li>Tipo e identificador de entidad, cuando se enviaron en la petición.</li><li>Publicidad comercial frente a anuncios propios de OSAP.</li></ul>
+<p>En OSAP puede resultar interesante explicar en qué contextos musicales se ha difundido una campaña: por ejemplo, fichas de obras, personas, clasificaciones o idiomas. El informe solo debe mostrar dimensiones que estén realmente registradas y que puedan interpretarse de forma estable. No debe deducir intereses personales ni crear perfiles de visitantes.</p>
+<h2>4. Cómo debería ser el informe para el anunciante</h2>
+<p>La evolución recomendada es un informe por pedido y campaña, con un resumen y un detalle descargable:</p>
+<table><tr><th>Bloque</th><th>Contenido</th></tr>
+<tr><td>Identificación</td><td>Anunciante, pedido, campaña, creatividad y periodo.</td></tr>
+<tr><td>Resumen</td><td>Entregas, impresiones registradas, clics registrados y CTR.</td></tr>
+<tr><td>Evolución temporal</td><td>Tabla o gráfico por día/semana, con zona horaria indicada.</td></tr>
+<tr><td>Distribución</td><td>Desglose por página, ubicación, idioma y formato.</td></tr>
+<tr><td>Economía informativa</td><td>Modelo contratado, tarifa, presupuesto acordado y consumo técnico registrado, separados de factura y pagos.</td></tr>
+<tr><td>Notas metodológicas</td><td>Explicar qué significa una impresión y qué no se mide.</td></tr></table>
+<h2>5. Requisitos antes de programar el cuadro de mando</h2>
+<ol>
+<li>Definir filtros comunes: periodo, anunciante, pedido, campaña y creatividad.</li>
+<li>Definir la zona horaria de presentación. Los registros se almacenan como fechas de evento/entrega; no se debe agrupar por día local sin explicitar la conversión.</li>
+<li>Calcular los totales desde <code>ad_deliveries</code> y <code>ad_events</code>, sin alterar el histórico ni contar dos veces una confirmación idempotente.</li>
+<li>Separar los anuncios propios y los comerciales.</li>
+<li>Mostrar cuándo una cifra es un recuento de registros y cuándo es un cálculo derivado.</li>
+<li>Permitir exportación CSV como primera salida sencilla; PDF puede añadirse después.</li>
+<li>Proteger los informes por anunciante: cada cliente solo debe acceder a sus propios pedidos. Esta autorización no existe todavía en el panel actual.</li>
+</ol>
+<h2>6. Lo que no se debe prometer</h2>
+<ul><li>Usuarios únicos, alcance o frecuencia real de personas: el identificador opaco se utiliza para límites de campaña, pero no convierte el sistema en una medición certificada de audiencia.</li><li>Viewability, tiempo en pantalla, visibilidad en viewport o atención del visitante.</li><li>Conversiones, ventas, registros o ingresos en el sitio del anunciante.</li><li>Datos demográficos o perfiles personales.</li><li>Reproducciones de vídeo verificadas.</li></ul>
+<p>Para medir visibilidad real haría falta instrumentación del lado del navegador y una definición explícita de viewability. Para medir conversiones haría falta un mecanismo separado, acordado con el anunciante y sujeto a revisión de privacidad. Ninguna de esas métricas debe simularse a partir de impresiones o clics actuales.</p>
+<div class="pager"><a href="07-limites.html">← 7. Glosario y límites</a><a href="09-gestion-economica.html">9. Gestión económica →</a></div>
+</main></div>
+<footer>Manual operativo de publicidad · Basado en la documentación y el código de ai_publicidad consultados el 03-11-2026. Las propuestas de evolución se identifican expresamente como pendientes.</footer></body></html>
