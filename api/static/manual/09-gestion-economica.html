@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>9. Gestión económica: tarifas, consumo y cobros · Manual OSAP</title><link rel="stylesheet" href="manual.css"></head><body>
+<header><small>OpenMusicRepository · ai_publicidad</small><h1>9. Gestión económica: tarifas, consumo y cobros</h1><p>Distinguir el acuerdo comercial, los límites del motor, el consumo calculado y la contabilidad.</p></header>
+<div class="layout"><nav><b>Manual de explotación</b><div><a href="index.html">Inicio</a><a href="01-solicitud.html">1. Solicitud</a><a href="02-propuesta.html">2. Propuesta</a><a href="03-alta.html">3. Alta</a><a href="04-publicacion.html">4. Publicación</a><a href="05-seguimiento.html">5. Seguimiento</a><a href="06-resultados.html">6. Resultados</a><a href="07-limites.html">7. Glosario y límites</a><a href="08-informes.html" >8. Informes</a><a href="09-gestion-economica.html" class="active">9. Gestión económica</a></div></nav><main>
+<p>El servicio publicitario contiene controles económicos para decidir si una campaña puede seguir entregándose y para registrar cargos técnicos por evento. Eso no significa que disponga de un sistema de facturación o cobro.</p>
+<div class="box warn"><b>Situación actual:</b> el modelo de pedidos admite tarifa fija, CPM y CPC, presupuestos y límites. El sistema calcula cargos para controlar el consumo, pero no emite facturas, no registra pagos recibidos y no concilia movimientos bancarios.</div>
+<h2>1. Las cinco piezas económicas</h2>
+<table><tr><th>Concepto</th><th>Qué representa</th><th>Estado en ai_publicidad</th></tr>
+<tr><td>Pedido/contrato</td><td>Acuerdo con el anunciante: vigencia, moneda, modelo y condiciones.</td><td>Implementado como configuración del pedido.</td></tr>
+<tr><td>Presupuesto y límites</td><td>Máximo autorizado de gasto variable o de actividad.</td><td>Aplicado como control de elegibilidad para CPM/CPC.</td></tr>
+<tr><td>Consumo/cargo técnico</td><td>Importe calculado a partir de impresiones CPM o clics CPC.</td><td>Registrado en los eventos, en microcéntimos.</td></tr>
+<tr><td>Factura</td><td>Documento fiscal emitido al cliente.</td><td>No implementada.</td></tr>
+<tr><td>Cobro</td><td>Dinero efectivamente recibido y conciliado.</td><td>No implementado.</td></tr></table>
+<p>Una cifra de consumo no demuestra que se haya emitido una factura ni que el cliente haya pagado. La factura y el cobro deben tener su propio registro y trazabilidad.</p>
+<h2>2. Modelos de tarifa</h2>
+<h3>Tarifa fija (<code>fixed</code>)</h3>
+<p>El pedido guarda <code>fixed_fee_cents</code>. Es el precio acordado para el servicio contratado. No se generan cargos variables por cada impresión o clic y no se aplica presupuesto diario/total ni pacing variable. La ejecución y las fechas de campaña siguen teniendo sus controles propios.</p>
+<h3>Coste por mil impresiones (CPM)</h3>
+<p>El pedido guarda <code>cpm_cents</code>. El cargo se genera cuando se registra una impresión válida, según el flujo de entrega. El cálculo unitario interno equivale a una milésima de la tarifa CPM por impresión. En <code>/compose</code> la impresión se registra al emitir el HTML; no es una verificación de visibilidad.</p>
+<h3>Coste por clic (CPC)</h3>
+<p>El pedido guarda <code>cpc_cents</code>. El cargo se calcula cuando se registra un clic mediante el enlace de seguimiento. No equivale a una conversión ni a una compra. El sistema registra activaciones del enlace; no ofrece una deduplicación de clics por visitante.</p>
+<h2>3. Unidades monetarias y precisión</h2>
+<p>Los importes introducidos por la API administrativa se expresan en <b>céntimos</b> de la moneda indicada en el pedido (por ejemplo, 1.250 céntimos = 12,50 EUR). El campo de cargo de cada evento se guarda como entero en <b>microcéntimos</b>, es decir, una millonésima parte de un céntimo, para evitar cálculos de coma flotante.</p>
+<table><tr><th>Modelo</th><th>Cálculo almacenado</th></tr>
+<tr><td>CPM</td><td><code>cpm_cents × 1.000</code> microcéntimos por impresión.</td></tr>
+<tr><td>CPC</td><td><code>cpc_cents × 1.000.000</code> microcéntimos por clic.</td></tr>
+<tr><td>Fijo</td><td>Sin cargo variable por evento; el importe fijo se conserva en el pedido.</td></tr></table>
+<p>Para expresar la suma de microcéntimos en céntimos se divide entre 1.000.000. La conversión a euros divide los céntimos entre 100. La moneda debe acompañar siempre a cualquier importe; no se deben sumar pedidos de monedas distintas.</p>
+<h2>4. Presupuestos, topes y pacing</h2>
+<ul><li><b>Presupuesto total:</b> límite económico acumulado de un pedido CPM/CPC.</li><li><b>Presupuesto diario:</b> límite económico del día UTC que utiliza el motor para el control actual.</li><li><b>Topes de impresiones y clics:</b> límites totales o diarios configurables en el pedido y también en la campaña.</li><li><b>Pacing uniforme:</b> distribuye el umbral de consumo a lo largo de las fechas del pedido. Requiere presupuesto total y fechas de inicio y fin.</li><li><b>Reserva CPM pendiente:</b> una entrega todavía no confirmada reserva temporalmente su coste previsto durante 15 minutos, para evitar que varias peticiones consuman repetidamente el mismo saldo. Una confirmación tardía vuelve a comprobar el presupuesto.</li></ul>
+<p>El control diario actual utiliza el comienzo del día UTC. Si los informes comerciales se muestran en hora peninsular u otra zona, deben explicar esa diferencia: un día de facturación local no siempre coincide con el día UTC del motor.</p>
+<h2>5. Ejemplo ilustrativo</h2>
+<p>Supongamos un pedido CPM de 20,00 EUR por mil impresiones. El valor introducido sería <code>2000</code> céntimos. Si se registran 2.500 impresiones, el consumo técnico calculado sería 50,00 EUR. Este ejemplo solo ilustra la fórmula: no representa una campaña real ni un cargo fiscal.</p>
+<p>En un pedido CPC de 0,30 EUR por clic, el valor introducido sería <code>30</code> céntimos. Si se registran 40 clics, el consumo técnico sería 12,00 EUR. Tampoco significa que se hayan producido 40 conversiones o ventas.</p>
+<h2>6. Qué debe añadirse para administrar facturas y cobros</h2>
+<p>La recomendación es mantener la contabilidad separada del motor que decide qué anuncio servir. El motor debe conservar sus eventos y cargos técnicos; un módulo económico independiente debe gestionar los documentos y el dinero real.</p>
+<table><tr><th>Elemento futuro</th><th>Información necesaria</th></tr>
+<tr><td>Ficha fiscal del cliente</td><td>Razón social, NIF/VAT, domicilio fiscal y país, con acceso restringido.</td></tr>
+<tr><td>Factura</td><td>Número/serie, fecha, periodo, líneas, base imponible, impuestos, descuentos, moneda, vencimiento y estado.</td></tr>
+<tr><td>Abono/corrección</td><td>Referencia a factura original, motivo, importes y documento rectificativo.</td></tr>
+<tr><td>Pago</td><td>Fecha, importe, moneda, método, referencia externa y estado de conciliación.</td></tr>
+<tr><td>Asignación de pagos</td><td>Relación entre uno o varios pagos y una o varias facturas, incluidos pagos parciales.</td></tr>
+<tr><td>Conciliación</td><td>Comparación entre factura, cargos técnicos, ajustes y dinero recibido.</td></tr></table>
+<h2>7. Decisiones que deben cerrarse antes de implementar facturación</h2>
+<ul><li>País y régimen fiscal aplicable, tratamiento del IVA y operaciones intracomunitarias si corresponden.</li><li>Moneda y reglas de redondeo por documento.</li><li>Si se factura por tarifa fija, por consumo real o mediante combinación de ambos.</li><li>Periodicidad de facturación, anticipos, mínimos, descuentos y límites de crédito.</li><li>Tratamiento de campañas pausadas, cancelaciones, impresiones anuladas y ajustes.</li><li>Series de factura, numeración, conservación documental y requisitos legales.</li><li>Gestión de pagos parciales, devoluciones, impagos y conciliación bancaria.</li><li>Quién puede consultar datos fiscales y quién puede emitir o rectificar documentos.</li></ul>
+<div class="box danger"><b>No convertir automáticamente el cargo técnico en factura.</b> Antes hay que definir las reglas fiscales y comerciales, y contrastarlas con asesoramiento contable/fiscal. La base de datos actual no sustituye esos requisitos.</div>
+<div class="pager"><a href="08-informes.html">← 8. Informes</a><a href="index.html">Volver al índice</a></div>
+</main></div>
+<footer>Manual operativo de publicidad · Basado en la documentación y el código de ai_publicidad consultados el 03-11-2026. Las propuestas de evolución se identifican expresamente como pendientes.</footer></body></html>
