@@ -2,7 +2,8 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from domain.models import AdDelivery, AdEvent, Campaign
+from domain.models import AdDelivery, AdEvent, AdOrder, Advertiser, Campaign
+from application.commercial import charge_microcents_for_event
 
 
 def _campaign(client, name: str, **extra) -> int:
@@ -104,3 +105,39 @@ def test_order_schema_rejects_invalid_cpm_and_pacing(client):
     assert invalid_cpm.status_code == 422
     invalid_pacing = client.post("/api/v1/admin/orders", json={"advertiser_id": advertiser_id, "name": "Bad pacing", "billing_model": "cpm", "cpm_cents": 100, "pacing_mode": "even"})
     assert invalid_pacing.status_code == 422
+
+
+
+def test_cpc_and_fixed_orders_apply_only_their_contractual_charge_model(test_engine):
+    with Session(test_engine) as db:
+        advertiser = Advertiser(name="Modelos económicos", status="active")
+        db.add(advertiser)
+        db.flush()
+        cpc_order = AdOrder(
+            advertiser_id=advertiser.id,
+            name="Pedido CPC",
+            status="active",
+            currency="EUR",
+            billing_model="cpc",
+            cpc_cents=25,
+            total_budget_cents=50,
+        )
+        fixed_order = AdOrder(
+            advertiser_id=advertiser.id,
+            name="Pedido fijo",
+            status="active",
+            currency="EUR",
+            billing_model="fixed",
+            fixed_fee_cents=4000,
+        )
+        db.add_all([cpc_order, fixed_order])
+        db.flush()
+        cpc_campaign = Campaign(name="Campaña CPC", status="active", order_id=cpc_order.id)
+        fixed_campaign = Campaign(name="Campaña fija", status="active", order_id=fixed_order.id)
+        db.add_all([cpc_campaign, fixed_campaign])
+        db.flush()
+
+        assert charge_microcents_for_event(db, cpc_campaign, "impression") == 0
+        assert charge_microcents_for_event(db, cpc_campaign, "click") == 25_000_000
+        assert charge_microcents_for_event(db, fixed_campaign, "impression") == 0
+        assert charge_microcents_for_event(db, fixed_campaign, "click") == 0
