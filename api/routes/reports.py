@@ -319,6 +319,7 @@ def report_export_csv(
                                           campaign_id, ad_kind, application, page_type,
                                           placement, language, dimension))
     output = StringIO()
+    output.write("\ufeff")
     writer = csv.writer(output, delimiter=";")
     writer.writerow(["Tipo", "Periodo UTC", "Dimensión", "Elemento", "Entregas", "Impresiones registradas",
                      "Clics registrados", "CTR (%)", "Moneda", "Cargo técnico (microcéntimos; vacío si hay varias monedas)"])
@@ -334,7 +335,7 @@ def report_export_csv(
     for row in data["daily"]:
         ctr = round(row["clicks"] / row["impressions"] * 100, 4) if row["impressions"] else ""
         writer.writerow(["diario", row["date"], "", "", row["deliveries"], row["impressions"],
-                         row["clicks"], ctr, row["charge_microcents"]])
+                         row["clicks"], ctr, data["summary"]["charge_currency"] or "", row["charge_microcents"] if row["charge_microcents"] is not None else ""])
     output.seek(0)
     filename = f'publicidad-{data["period"]["start_date"]}-{data["period"]["end_date"]}.csv'
     return StreamingResponse(
