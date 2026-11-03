@@ -378,7 +378,7 @@ def report_export_csv(
                      summary["charge_currency"] or "", summary["charge_microcents"] if summary["charge_microcents"] is not None else ""])
     for row in data["breakdown"]:
         ctr = round(row["clicks"] / row["impressions"] * 100, 4) if row["impressions"] else ""
-        writer.writerow(["desglose", "", data["dimension"], _safe_csv_cell(row["label"]), row["deliveries"],
+        writer.writerow(["desglose", "", data["dimension"], _safe_csv_cell(row["label"] + (f' (#{row["id"]})' if row.get("id") is not None else "")), row["deliveries"],
                          row["impressions"], row["clicks"], ctr, data["summary"]["charge_currency"] or "", row["charge_microcents"] if row["charge_microcents"] is not None else ""])
     for row in data["daily"]:
         ctr = round(row["clicks"] / row["impressions"] * 100, 4) if row["impressions"] else ""
