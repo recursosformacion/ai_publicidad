@@ -31,10 +31,15 @@ from domain.models import (
     brand_competitors,
     creative_ad_formats,
 )
+from application.security import require_service_token
 from infrastructure.database import get_db
 
 # Authorization is intentionally deferred to a later phase.
-router = APIRouter(prefix="/admin", tags=["administration"])
+router = APIRouter(
+    prefix="/admin",
+    tags=["administration"],
+    dependencies=[Depends(require_service_token)],
+)
 
 
 def _not_found(kind: str, record_id: int) -> HTTPException:
@@ -607,3 +612,4 @@ def get_event(event_id: int, db: Session = Depends(get_db)) -> AdEvent:
     if event is None:
         raise _not_found("Evento", event_id)
     return event
+
