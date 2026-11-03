@@ -78,7 +78,7 @@ def _apply_delivery_filters(query, start_dt, end_dt, advertiser_id, order_id, ca
 
 
 def _apply_event_filters(query, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
-                         application, page_type, placement, language):
+                         application, page_type, placement, language, entity_type, entity_id):
     query = query.where(AdEvent.occurred_at >= start_dt, AdEvent.occurred_at < end_dt)
     if advertiser_id is not None:
         query = query.where(AdOrder.advertiser_id == advertiser_id)
@@ -100,6 +100,10 @@ def _apply_event_filters(query, start_dt, end_dt, advertiser_id, order_id, campa
         query = query.where(AdDelivery.placement == placement)
     if language:
         query = query.where(AdDelivery.language == language)
+    if entity_type:
+        query = query.where(AdDelivery.entity_type == entity_type)
+    if entity_id:
+        query = query.where(AdDelivery.entity_id == entity_id)
     return query
 
 
@@ -134,7 +138,7 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
     )
     event_base = _apply_event_filters(
         event_base, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
-        application, page_type, placement, language,
+        application, page_type, placement, language, entity_type, entity_id,
     )
     impressions, clicks, charges = db.execute(event_base).one()
     impressions, clicks, charges = int(impressions or 0), int(clicks or 0), int(charges or 0)
@@ -148,7 +152,7 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
     )
     currency_query = _apply_delivery_filters(
         currency_query, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
-        application, page_type, placement, language,
+        application, page_type, placement, language, entity_type, entity_id,
     ).distinct()
     currencies = sorted(set(db.scalars(currency_query).all()))
     charge_currency = currencies[0] if len(currencies) == 1 else None
@@ -171,7 +175,7 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
         delivery_group = delivery_group.outerjoin(Advertiser, Advertiser.id == AdOrder.advertiser_id)
     delivery_group = _apply_delivery_filters(
         delivery_group, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
-        application, page_type, placement, language,
+        application, page_type, placement, language, entity_type, entity_id,
     ).group_by(dimension_expr).order_by(func.count(AdDelivery.id).desc()).limit(100)
 
     event_group = (
@@ -194,7 +198,7 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
         event_group = event_group.outerjoin(Advertiser, Advertiser.id == AdOrder.advertiser_id)
     event_group = _apply_event_filters(
         event_group, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
-        application, page_type, placement, language,
+        application, page_type, placement, language, entity_type, entity_id,
     ).group_by(dimension_expr).order_by(func.sum(case((AdEvent.event_type == "impression", 1), else_=0)).desc()).limit(100)
 
     grouped: dict[str, dict] = {}
@@ -222,7 +226,7 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
     )
     delivery_days = _apply_delivery_filters(
         delivery_days, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
-        application, page_type, placement, language,
+        application, page_type, placement, language, entity_type, entity_id,
     ).group_by(func.date(AdDelivery.delivered_at))
     event_days = (
         select(
@@ -238,7 +242,7 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
     )
     event_days = _apply_event_filters(
         event_days, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
-        application, page_type, placement, language,
+        application, page_type, placement, language, entity_type, entity_id,
     ).group_by(func.date(AdEvent.occurred_at))
 
     days: dict[str, dict] = {}
@@ -329,13 +333,15 @@ def report_export_csv(
     page_type: str | None = Query(default=None, max_length=80),
     placement: str | None = Query(default=None, max_length=80),
     language: str | None = Query(default=None, max_length=12),
-    dimension: str = Query(default="page_type", pattern="^(application|page_type|placement|language|entity_type|format|campaign|creative|advertiser)$"),
+    entity_type: str | None = Query(default=None, max_length=80),
+    entity_id: str | None = Query(default=None, max_length=160),
+    dimension: str = Query(default="page_type", pattern="^(application|page_type|placement|language|entity_type|format|campaign|creative|advertiser|entity_id)$"),
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """Export the same filtered report as a UTF-8 CSV spreadsheet."""
     data = _report_data(db, **_parameters(start_date, end_date, advertiser_id, order_id,
                                           campaign_id, creative_id, ad_kind, application, page_type,
-                                          placement, language, dimension))
+                                          placement, language, entity_type, entity_id, dimension))
     output = StringIO()
     output.write("\ufeff")
     writer = csv.writer(output, delimiter=";")
