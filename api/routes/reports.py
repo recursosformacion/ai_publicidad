@@ -255,7 +255,7 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
 
     return {
         "period": {"start_date": start.isoformat(), "end_date": end.isoformat(), "timezone": "UTC"},
-        "filters": {"advertiser_id": advertiser_id, "order_id": order_id, "campaign_id": campaign_id,
+        "filters": {"advertiser_id": advertiser_id, "order_id": order_id, "campaign_id": campaign_id, "creative_id": creative_id,
                     "ad_kind": ad_kind, "application": application, "page_type": page_type,
                     "placement": placement, "language": language},
         "summary": {
@@ -316,12 +316,13 @@ def report_export_csv(
     advertiser_id: int | None = Query(default=None, gt=0),
     order_id: int | None = Query(default=None, gt=0),
     campaign_id: int | None = Query(default=None, gt=0),
+    creative_id: int | None = Query(default=None, gt=0),
     ad_kind: str = Query(default="all", pattern="^(all|commercial|house)$"),
     application: str | None = Query(default=None, max_length=80),
     page_type: str | None = Query(default=None, max_length=80),
     placement: str | None = Query(default=None, max_length=80),
     language: str | None = Query(default=None, max_length=12),
-    dimension: str = Query(default="page_type", pattern="^(application|page_type|placement|language|entity_type|format|campaign|advertiser)$"),
+    dimension: str = Query(default="page_type", pattern="^(application|page_type|placement|language|entity_type|format|campaign|creative|advertiser)$"),
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """Export the same filtered report as a UTF-8 CSV spreadsheet."""
