@@ -11,7 +11,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from application.security import require_service_token
-from domain.models import AdDelivery, AdEvent, AdFormat, AdOrder, Advertiser, Campaign
+from domain.models import AdDelivery, AdEvent, AdFormat, AdOrder, Advertiser, Campaign, Creative
 from infrastructure.database import get_db
 
 router = APIRouter(
@@ -28,6 +28,7 @@ DIMENSIONS = {
     "entity_type": (AdDelivery.entity_type, "entity_type"),
     "format": (AdFormat.name, "format"),
     "campaign": (Campaign.name, "campaign"),
+    "creative": (Creative.title, "creative"),
     "advertiser": (Advertiser.name, "advertiser"),
 }
 
@@ -45,7 +46,7 @@ def _period(start_date: date | None, end_date: date | None) -> tuple[date, date,
     return start, end, start_dt, end_dt
 
 
-def _apply_delivery_filters(query, start_dt, end_dt, advertiser_id, order_id, campaign_id, ad_kind,
+def _apply_delivery_filters(query, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
                             application, page_type, placement, language):
     query = query.where(AdDelivery.delivered_at >= start_dt, AdDelivery.delivered_at < end_dt)
     if advertiser_id is not None:
@@ -54,6 +55,8 @@ def _apply_delivery_filters(query, start_dt, end_dt, advertiser_id, order_id, ca
         query = query.where(Campaign.order_id == order_id)
     if campaign_id is not None:
         query = query.where(Campaign.id == campaign_id)
+    if creative_id is not None:
+        query = query.where(AdDelivery.creative_id == creative_id)
     if ad_kind == "house":
         query = query.where(Campaign.is_house_ad.is_(True))
     elif ad_kind == "commercial":
@@ -69,7 +72,7 @@ def _apply_delivery_filters(query, start_dt, end_dt, advertiser_id, order_id, ca
     return query
 
 
-def _apply_event_filters(query, start_dt, end_dt, advertiser_id, order_id, campaign_id, ad_kind,
+def _apply_event_filters(query, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
                          application, page_type, placement, language):
     query = query.where(AdEvent.occurred_at >= start_dt, AdEvent.occurred_at < end_dt)
     if advertiser_id is not None:
@@ -94,7 +97,7 @@ def _apply_event_filters(query, start_dt, end_dt, advertiser_id, order_id, campa
 
 
 def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
-                 advertiser_id: int | None, order_id: int | None, campaign_id: int | None,
+                 advertiser_id: int | None, order_id: int | None, campaign_id: int | None, creative_id: int | None,
                  ad_kind: str, application: str | None, page_type: str | None,
                  placement: str | None, language: str | None, dimension: str) -> dict:
     start, end, start_dt, end_dt = _period(start_date, end_date)
@@ -106,7 +109,7 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
         .outerjoin(AdOrder, AdOrder.id == Campaign.order_id)
     )
     delivery_query = _apply_delivery_filters(
-        delivery_query, start_dt, end_dt, advertiser_id, order_id, campaign_id, ad_kind,
+        delivery_query, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
         application, page_type, placement, language,
     )
     deliveries = int(db.scalar(delivery_query) or 0)
@@ -155,6 +158,8 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
     )
     if dimension == "format":
         delivery_group = delivery_group.outerjoin(AdFormat, AdFormat.id == AdDelivery.ad_format_id)
+    if dimension == "creative":
+        delivery_group = delivery_group.join(Creative, Creative.id == AdDelivery.creative_id)
     if dimension == "advertiser":
         delivery_group = delivery_group.outerjoin(Advertiser, Advertiser.id == AdOrder.advertiser_id)
     delivery_group = _apply_delivery_filters(
@@ -176,6 +181,8 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
     )
     if dimension == "format":
         event_group = event_group.outerjoin(AdFormat, AdFormat.id == AdDelivery.ad_format_id)
+    if dimension == "creative":
+        event_group = event_group.join(Creative, Creative.id == AdDelivery.creative_id)
     if dimension == "advertiser":
         event_group = event_group.outerjoin(Advertiser, Advertiser.id == AdOrder.advertiser_id)
     event_group = _apply_event_filters(
@@ -270,10 +277,10 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
     }
 
 
-def _parameters(start_date, end_date, advertiser_id, order_id, campaign_id, ad_kind,
+def _parameters(start_date, end_date, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
                 application, page_type, placement, language, dimension):
     return dict(start_date=start_date, end_date=end_date, advertiser_id=advertiser_id,
-                order_id=order_id, campaign_id=campaign_id, ad_kind=ad_kind,
+                order_id=order_id, campaign_id=campaign_id, creative_id=creative_id, ad_kind=ad_kind,
                 application=application, page_type=page_type, placement=placement,
                 language=language, dimension=dimension)
 
@@ -285,17 +292,18 @@ def report_summary(
     advertiser_id: int | None = Query(default=None, gt=0),
     order_id: int | None = Query(default=None, gt=0),
     campaign_id: int | None = Query(default=None, gt=0),
+    creative_id: int | None = Query(default=None, gt=0),
     ad_kind: str = Query(default="all", pattern="^(all|commercial|house)$"),
     application: str | None = Query(default=None, max_length=80),
     page_type: str | None = Query(default=None, max_length=80),
     placement: str | None = Query(default=None, max_length=80),
     language: str | None = Query(default=None, max_length=12),
-    dimension: str = Query(default="page_type", pattern="^(application|page_type|placement|language|entity_type|format|campaign|advertiser)$"),
+    dimension: str = Query(default="page_type", pattern="^(application|page_type|placement|language|entity_type|format|campaign|creative|advertiser)$"),
     db: Session = Depends(get_db),
 ) -> dict:
     """Return read-only KPIs, daily activity and one selectable breakdown."""
     return _report_data(db, **_parameters(start_date, end_date, advertiser_id, order_id,
-                                          campaign_id, ad_kind, application, page_type,
+                                          campaign_id, creative_id, ad_kind, application, page_type,
                                           placement, language, dimension))
 
 
