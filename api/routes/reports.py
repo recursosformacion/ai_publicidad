@@ -26,6 +26,7 @@ DIMENSIONS = {
     "placement": (AdDelivery.placement, "placement"),
     "language": (AdDelivery.language, "language"),
     "entity_type": (AdDelivery.entity_type, "entity_type"),
+    "entity_id": (AdDelivery.entity_id, "entity_id"),
     "format": (AdFormat.name, "format"),
     "campaign": (Campaign.name, "campaign"),
     "creative": (Creative.title, "creative"),
@@ -47,7 +48,7 @@ def _period(start_date: date | None, end_date: date | None) -> tuple[date, date,
 
 
 def _apply_delivery_filters(query, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
-                            application, page_type, placement, language):
+                            application, page_type, placement, language, entity_type, entity_id):
     query = query.where(AdDelivery.delivered_at >= start_dt, AdDelivery.delivered_at < end_dt)
     if advertiser_id is not None:
         query = query.where(AdOrder.advertiser_id == advertiser_id)
@@ -69,6 +70,10 @@ def _apply_delivery_filters(query, start_dt, end_dt, advertiser_id, order_id, ca
         query = query.where(AdDelivery.placement == placement)
     if language:
         query = query.where(AdDelivery.language == language)
+    if entity_type:
+        query = query.where(AdDelivery.entity_type == entity_type)
+    if entity_id:
+        query = query.where(AdDelivery.entity_id == entity_id)
     return query
 
 
@@ -101,7 +106,7 @@ def _apply_event_filters(query, start_dt, end_dt, advertiser_id, order_id, campa
 def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
                  advertiser_id: int | None, order_id: int | None, campaign_id: int | None, creative_id: int | None,
                  ad_kind: str, application: str | None, page_type: str | None,
-                 placement: str | None, language: str | None, dimension: str) -> dict:
+                 placement: str | None, language: str | None, entity_type: str | None, entity_id: str | None, dimension: str) -> dict:
     start, end, start_dt, end_dt = _period(start_date, end_date)
 
     delivery_query = (
@@ -112,7 +117,7 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
     )
     delivery_query = _apply_delivery_filters(
         delivery_query, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
-        application, page_type, placement, language,
+        application, page_type, placement, language, entity_type, entity_id,
     )
     deliveries = int(db.scalar(delivery_query) or 0)
 
@@ -257,7 +262,7 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
         "period": {"start_date": start.isoformat(), "end_date": end.isoformat(), "timezone": "UTC"},
         "filters": {"advertiser_id": advertiser_id, "order_id": order_id, "campaign_id": campaign_id, "creative_id": creative_id,
                     "ad_kind": ad_kind, "application": application, "page_type": page_type,
-                    "placement": placement, "language": language},
+                    "placement": placement, "language": language, "entity_type": entity_type, "entity_id": entity_id},
         "summary": {
             "deliveries": deliveries, "impressions": impressions, "clicks": clicks,
             "ctr_percent": round(clicks / impressions * 100, 4) if impressions else None,
@@ -280,11 +285,11 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
 
 
 def _parameters(start_date, end_date, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
-                application, page_type, placement, language, dimension):
+                application, page_type, placement, language, entity_type, entity_id, dimension):
     return dict(start_date=start_date, end_date=end_date, advertiser_id=advertiser_id,
                 order_id=order_id, campaign_id=campaign_id, creative_id=creative_id, ad_kind=ad_kind,
                 application=application, page_type=page_type, placement=placement,
-                language=language, dimension=dimension)
+                language=language, entity_type=entity_type, entity_id=entity_id, dimension=dimension)
 
 
 @router.get("/summary")
@@ -300,13 +305,15 @@ def report_summary(
     page_type: str | None = Query(default=None, max_length=80),
     placement: str | None = Query(default=None, max_length=80),
     language: str | None = Query(default=None, max_length=12),
-    dimension: str = Query(default="page_type", pattern="^(application|page_type|placement|language|entity_type|format|campaign|creative|advertiser)$"),
+    entity_type: str | None = Query(default=None, max_length=80),
+    entity_id: str | None = Query(default=None, max_length=160),
+    dimension: str = Query(default="page_type", pattern="^(application|page_type|placement|language|entity_type|format|campaign|creative|advertiser|entity_id)$"),
     db: Session = Depends(get_db),
 ) -> dict:
     """Return read-only KPIs, daily activity and one selectable breakdown."""
     return _report_data(db, **_parameters(start_date, end_date, advertiser_id, order_id,
                                           campaign_id, creative_id, ad_kind, application, page_type,
-                                          placement, language, dimension))
+                                          placement, language, entity_type, entity_id, dimension))
 
 
 @router.get("/export.csv")
