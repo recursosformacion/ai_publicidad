@@ -27,6 +27,8 @@ def test_admin_panel_is_served_and_contains_navigation_and_crud_controls():
         'id="report-export"',
         "reportSummary",
         "reportExport",
+        "async function apiAll(path)",
+        '(item.id?item.label+" (#"+item.id+")":item.label)',
         'id="record-form"',
         'id="create"',
         'id="save-form"',
