@@ -164,3 +164,63 @@ def test_report_rejects_invalid_period_and_dimension(client):
         params={"dimension": "visitor_id"},
     )
     assert response.status_code == 422
+
+
+
+def test_report_does_not_add_charges_from_different_currencies(client, test_engine):
+    advertiser_id, _, _ = _seed_report_data(test_engine)
+    now = datetime.now(timezone.utc)
+    with Session(test_engine) as db:
+        usd_order = AdOrder(
+            advertiser_id=advertiser_id,
+            name="Pedido USD",
+            status="active",
+            billing_model="cpc",
+            cpc_cents=10,
+            currency="USD",
+        )
+        db.add(usd_order)
+        db.flush()
+        campaign = Campaign(name="Campaña USD", status="active", order_id=usd_order.id)
+        db.add(campaign)
+        db.flush()
+        creative = Creative(
+            campaign_id=campaign.id,
+            title="Creatividad USD",
+            format="text",
+            language="en",
+            destination_url="https://example.net",
+            status="approved",
+        )
+        db.add(creative)
+        db.flush()
+        delivery = AdDelivery(
+            token="usd-report-token",
+            creative_id=creative.id,
+            campaign_id=campaign.id,
+            application="omr",
+            page_type="work",
+            placement="sidebar",
+            language="en",
+            delivered_at=now,
+        )
+        db.add(delivery)
+        db.flush()
+        db.add(AdEvent(
+            delivery_id=delivery.id,
+            event_type="click",
+            occurred_at=now,
+            charge_microcents=10_000_000,
+        ))
+        db.commit()
+
+    today = now.date().isoformat()
+    response = client.get(
+        "/api/v1/admin/reports/summary",
+        params={"start_date": today, "end_date": today},
+    )
+    assert response.status_code == 200
+    summary = response.json()["summary"]
+    assert summary["multiple_currencies"] is True
+    assert summary["charge_currency"] is None
+    assert summary["charge_microcents"] is None
