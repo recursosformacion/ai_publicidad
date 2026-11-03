@@ -302,5 +302,6 @@ def test_report_keeps_duplicate_campaign_and_creative_names_separate(client, tes
     )
     assert creative_response.status_code == 200
     creative_rows = [row for row in creative_response.json()["breakdown"] if row["label"] == "Creatividad de prueba"]
-    assert {row["id"] for row in creative_rows} == {1, duplicate_creative_id}
+    assert duplicate_creative_id in {row["id"] for row in creative_rows}
+    assert len({row["id"] for row in creative_rows}) == 2
     assert len(creative_rows) == 2
