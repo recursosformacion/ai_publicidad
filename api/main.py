@@ -2,8 +2,10 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from api.routes.ads import router as ads_router
 from api.routes.admin import router as admin_router
@@ -48,6 +50,11 @@ app.include_router(commercial_admin_router, prefix="/api/v1")
 app.include_router(admin_ui_router)
 app.include_router(events_router, prefix="/api/v1")
 app.include_router(clicks_router)
+app.mount(
+    "/manual",
+    StaticFiles(directory=Path(__file__).resolve().parent / "static" / "manual", html=True),
+    name="manual",
+)
 
 
 def run() -> None:
@@ -59,3 +66,4 @@ def run() -> None:
 
 if __name__ == "__main__":
     run()
+

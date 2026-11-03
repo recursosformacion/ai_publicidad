@@ -1,0 +1,21 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>3. Dar de alta la publicidad · Manual OSAP</title><link rel="stylesheet" href="manual.css"></head><body><header><small>OpenMusicRepository · ai_publicidad</small><h1>3. Dar de alta la publicidad</h1><p>El orden de registro evita mezclar cliente, condiciones, identidad comercial y pieza creativa.</p></header><div class="layout"><nav><b>Manual de explotación</b><div><a href="index.html" class="">Inicio</a><a href="01-solicitud.html" class="">1. Solicitud</a><a href="02-propuesta.html" class="">2. Propuesta</a><a href="03-alta.html" class="active">3. Alta</a><a href="04-publicacion.html" class="">4. Publicación</a><a href="05-seguimiento.html" class="">5. Seguimiento</a><a href="06-resultados.html" class="">6. Resultados</a><a href="07-limites.html" class="">7. Glosario y límites</a></div></nav><main>
+<h2>Orden de trabajo en el panel</h2>
+<ol><li><b>Anunciantes:</b> crear cliente; completar nombre, razón social, contacto, correo, teléfono, web y notas.</li>
+<li><b>Pedidos / contratos:</b> asociar al anunciante; definir referencia, estado, moneda, fechas, modelo CPM/CPC/fijo, tarifas, presupuestos y límites.</li>
+<li><b>Marcas y competencia:</b> registrar la marca que aparecerá en el anuncio y sus competidores. Las marcas declaradas competidoras no se colocan juntas en un mismo bloque.</li>
+<li><b>Campañas:</b> crear campaña y asociarla al pedido y marca; definir fechas, estado, prioridad, intervalo mínimo y topes.</li>
+<li><b>Creatividades / anuncios:</b> crear pieza con título, cuerpo, imagen, texto alternativo, idioma, destino, tipo de creatividad y formatos.</li>
+<li><b>Reglas de segmentación:</b> limitar por aplicación, tipo de página, ubicación, idioma, tipo de entidad o ID de entidad.</li></ol>
+<h2>Qué representa cada registro</h2>
+<div class="cards"><div class="card"><h3>Anunciante</h3><p>Quién contrata y con quién hablamos.</p></div><div class="card"><h3>Pedido</h3><p>Precio, fechas, presupuesto y límites acordados.</p></div><div class="card"><h3>Marca</h3><p>Identidad comercial y conflictos competitivos.</p></div><div class="card"><h3>Campaña</h3><p>Vigencia y reglas operativas de entrega.</p></div><div class="card"><h3>Creatividad</h3><p>Lo que ve el usuario: texto, imagen y enlace.</p></div><div class="card"><h3>Reglas</h3><p>Dónde se permite o prohíbe mostrarla.</p></div></div>
+<h2>Estados que importan</h2>
+<table><tr><th>Elemento</th><th>Estados</th><th>Condición para servir</th></tr>
+<tr><td>Anunciante</td><td>Activo, pausado, archivado</td><td>Debe estar activo.</td></tr>
+<tr><td>Pedido</td><td>Borrador, activo, pausado, finalizado, cancelado, archivado</td><td>Debe estar activo y vigente.</td></tr>
+<tr><td>Campaña</td><td>Borrador, activa, pausada, finalizada, cancelada, archivada</td><td>Debe estar activa y dentro de fechas.</td></tr>
+<tr><td>Creatividad</td><td>Borrador, aprobada, pausada, rechazada, archivada</td><td>Debe estar aprobada.</td></tr></table>
+<h2>Preparar el material</h2>
+<ul><li>Las creatividades de tipo imagen o imagen+texto necesitan URL de imagen.</li><li>Toda imagen necesita texto alternativo (ALT).</li><li>El destino debe ser una URL HTTP(S) válida y revisada.</li><li>Asociar solo formatos que el material pueda ocupar sin deformarse.</li><li>El HTML de salida lo genera el servicio; no introducir scripts ni HTML libre del anunciante.</li></ul>
+<h2>Segmentación</h2><p>Las reglas admiten aplicación, tipo de página, ubicación, idioma, tipo de entidad e ID de entidad. Varias inclusiones del mismo campo son alternativas; las exclusiones prevalecen si coinciden. Ejemplo: incluir fichas de obra y excluir una ubicación concreta.</p>
+<div class="box warn"><b>Consejo:</b> empezar con una segmentación sencilla y ampliarla solo cuando haya una razón comercial. Demasiadas restricciones pueden dejar la creatividad sin ningún espacio elegible.</div>
+<div class="pager"><a href="02-propuesta.html">← 2. Propuesta</a><a href="04-publicacion.html">4. Publicación →</a></div></main></div><footer>Manual operativo de publicidad · Basado en la documentación y el código de ai_publicidad consultados el 03-11-2026. Revisar cuando cambie el funcionamiento del servicio.</footer></body></html>

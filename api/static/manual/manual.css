@@ -1,0 +1,13 @@
+
+:root{--ink:#203044;--muted:#607286;--line:#dce4ec;--paper:#fff;--ground:#f3f6fa;--nav:#17304b;--blue:#2468a5;--bluebg:#eaf3fb;--amber:#fff4dc;--red:#fff0f0}
+*{box-sizing:border-box}body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.65 system-ui,Segoe UI,sans-serif}
+header{background:linear-gradient(120deg,#17304b,#28577d);color:white;padding:32px max(22px,calc((100% - 1080px)/2))}
+header small{letter-spacing:.12em;text-transform:uppercase;opacity:.8}header h1{font-size:clamp(1.8rem,4vw,2.6rem);line-height:1.15;margin:.4rem 0}header p{max-width:850px;color:#e3edf6;margin:0}
+.layout{max-width:1080px;margin:26px auto;padding:0 18px;display:grid;grid-template-columns:235px minmax(0,1fr);gap:22px}
+nav{background:var(--nav);color:white;border-radius:12px;padding:16px;height:max-content;position:sticky;top:16px}nav b{display:block;font-size:.78rem;text-transform:uppercase;color:#afc3d7;margin:4px 8px 10px}nav a{display:block;color:#e5eef7;text-decoration:none;padding:7px 9px;border-radius:7px;font-size:.92rem}nav a:hover,nav a.active{background:#315473}
+main{background:white;border:1px solid var(--line);border-radius:12px;padding:clamp(20px,4vw,36px);min-width:0}h2{font-size:1.4rem;margin:1.8rem 0 .55rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}h3{font-size:1.08rem;margin:1.25rem 0 .35rem}
+p{margin:.55rem 0 1rem}li{margin:.3rem 0}table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.94rem}th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{background:#f4f7fa}
+code{background:#eef2f6;padding:2px 4px;border-radius:4px;font-size:.92em}.box{padding:13px 16px;border-radius:8px;background:var(--bluebg);border-left:4px solid var(--blue);margin:1rem 0}.warn{background:var(--amber);border-color:#c58a28}.danger{background:var(--red);border-color:#a33}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:12px;margin:1rem 0}.card{border:1px solid var(--line);border-radius:9px;padding:14px}.card p{color:var(--muted);margin:0;font-size:.93rem}
+footer{max-width:1080px;margin:auto;padding:0 18px 28px;color:var(--muted);font-size:.85rem}.pager{display:flex;justify-content:space-between;margin-top:2rem;padding-top:1rem;border-top:1px solid var(--line)}.pager a{font-weight:650;text-decoration:none}
+@media(max-width:760px){.layout{grid-template-columns:1fr}nav{position:static}nav div{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr))}main{padding:21px}}

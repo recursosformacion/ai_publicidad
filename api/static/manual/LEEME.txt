@@ -1,0 +1,20 @@
+MANUAL DE EXPLOTACIÓN PUBLICITARIA OSAP
+
+Extraer todos los archivos de la carpeta manual en:
+D:\Proyectos\AI_OSAP\ai_publicidad\api\static\manual
+
+Abrir index.html en el navegador.
+
+Incluye:
+index.html
+01-solicitud.html
+02-propuesta.html
+03-alta.html
+04-publicacion.html
+05-seguimiento.html
+06-resultados.html
+07-limites.html
+manual.css
+
+Es documentación solamente: no modifica código ni base de datos.
+El texto distingue funciones implementadas de integración/seguridad/informes pendientes.
