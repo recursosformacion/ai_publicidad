@@ -134,7 +134,7 @@ def test_report_summary_filters_campaign_and_computes_ctr(client, test_engine):
     assert creative_report.json()["breakdown"][0]["label"] == "Creatividad de prueba"
     entity_report = client.get(
         "/api/v1/admin/reports/summary",
-        params={"start_date": today, "end_date": today, "entity_type": "work", "dimension": "entity_id"},
+        params={"start_date": today, "end_date": today, "campaign_id": campaign_id, "entity_type": "work", "dimension": "entity_id"},
     )
     assert entity_report.status_code == 200
     assert entity_report.json()["breakdown"][0]["label"] == "42"
