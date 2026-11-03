@@ -237,3 +237,70 @@ def test_report_does_not_add_charges_from_different_currencies(client, test_engi
     assert summary["multiple_currencies"] is True
     assert summary["charge_currency"] is None
     assert summary["charge_microcents"] is None
+
+
+
+def test_report_keeps_duplicate_campaign_and_creative_names_separate(client, test_engine):
+    advertiser_id, order_id, original_campaign_id = _seed_report_data(test_engine)
+    now = datetime.now(timezone.utc)
+    with Session(test_engine) as db:
+        original = db.get(Campaign, original_campaign_id)
+        duplicate_campaign = Campaign(
+            name=original.name,
+            status="active",
+            order_id=order_id,
+        )
+        db.add(duplicate_campaign)
+        db.flush()
+        duplicate_creative = Creative(
+            campaign_id=duplicate_campaign.id,
+            title="Creatividad de prueba",
+            format="text",
+            language="es",
+            destination_url="https://example.net",
+            status="approved",
+        )
+        db.add(duplicate_creative)
+        db.flush()
+        delivery = AdDelivery(
+            token="duplicate-name-report-token",
+            creative_id=duplicate_creative.id,
+            campaign_id=duplicate_campaign.id,
+            application="omr",
+            page_type="work",
+            entity_type="work",
+            entity_id="99",
+            placement="sidebar",
+            language="es",
+            delivered_at=now,
+        )
+        db.add(delivery)
+        db.flush()
+        db.add(AdEvent(
+            delivery_id=delivery.id,
+            event_type="impression",
+            occurred_at=now,
+            deduplication_key=f"impression:{delivery.id}",
+        ))
+        db.commit()
+        duplicate_campaign_id = duplicate_campaign.id
+        duplicate_creative_id = duplicate_creative.id
+
+    today = now.date().isoformat()
+    campaign_response = client.get(
+        "/api/v1/admin/reports/summary",
+        params={"start_date": today, "end_date": today, "advertiser_id": advertiser_id, "dimension": "campaign"},
+    )
+    assert campaign_response.status_code == 200
+    campaign_rows = [row for row in campaign_response.json()["breakdown"] if row["label"] == "Campaña comercial"]
+    assert {row["id"] for row in campaign_rows} == {original_campaign_id, duplicate_campaign_id}
+    assert len(campaign_rows) == 2
+
+    creative_response = client.get(
+        "/api/v1/admin/reports/summary",
+        params={"start_date": today, "end_date": today, "order_id": order_id, "dimension": "creative"},
+    )
+    assert creative_response.status_code == 200
+    creative_rows = [row for row in creative_response.json()["breakdown"] if row["label"] == "Creatividad de prueba"]
+    assert {row["id"] for row in creative_rows} == {1, duplicate_creative_id}
+    assert len(creative_rows) == 2
