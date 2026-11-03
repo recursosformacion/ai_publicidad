@@ -2,8 +2,8 @@
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>8. Informes y estadísticas · Manual OSAP</title><link rel="stylesheet" href="manual.css"></head><body>
 <header><small>OpenMusicRepository · ai_publicidad</small><h1>8. Informes y estadísticas</h1><p>Cómo convertir los registros publicitarios en información útil para OSAP y para el anunciante.</p></header>
 <div class="layout"><nav><b>Manual de explotación</b><div><a href="index.html">Inicio</a><a href="01-solicitud.html">1. Solicitud</a><a href="02-propuesta.html">2. Propuesta</a><a href="03-alta.html">3. Alta</a><a href="04-publicacion.html">4. Publicación</a><a href="05-seguimiento.html">5. Seguimiento</a><a href="06-resultados.html">6. Resultados</a><a href="07-limites.html">7. Glosario y límites</a><a href="08-informes.html" class="active">8. Informes</a><a href="09-gestion-economica.html" >9. Gestión económica</a></div></nav><main>
-<p>Este capítulo separa dos cosas que no deben confundirse: <b>los datos que el servicio ya registra</b> y <b>los informes que todavía habría que construir</b>. El panel actual permite consultar entregas y eventos individuales, pero no genera un cuadro de mando agregado ni informes descargables.</p>
-<div class="box warn"><b>Situación actual:</b> no hay que presentar este capítulo como una función ya disponible. Describe qué se puede calcular con el histórico existente y cómo debería organizarse una futura pantalla de informes, sin modificar ni reinterpretar los registros originales.</div>
+<p>Este capítulo explica cómo utilizar el informe agregado incorporado al panel de administración. El sistema consulta las entregas y eventos existentes sin modificarlos, calcula indicadores y permite exportar el resultado a CSV.</p>
+<div class="box"><b>Disponible en el panel:</b> abre «Informes y estadísticas» en el menú lateral de <code>/admin</code>. Puedes filtrar por fechas, anunciante, pedido, campaña, tipo de publicidad y contexto; elegir el desglose; y exportar el mismo resultado a CSV. El intervalo máximo es de 366 días y las fechas se interpretan en UTC.</div>
 <h2>1. Qué información existe</h2>
 <table><tr><th>Dato</th><th>Origen</th><th>Uso</th></tr>
 <tr><td>Entrega</td><td><code>ad_deliveries</code></td><td>Una creatividad seleccionada y emitida en un contexto concreto.</td></tr>
@@ -26,8 +26,10 @@
 <p>Los campos almacenados permiten preparar informes por:</p>
 <ul><li>Periodo (día, semana, mes o intervalo elegido).</li><li>Anunciante y pedido/contrato.</li><li>Campaña y creatividad.</li><li>Aplicación y tipo de página.</li><li>Ubicación publicitaria (<code>placement</code>).</li><li>Idioma y formato.</li><li>Tipo e identificador de entidad, cuando se enviaron en la petición.</li><li>Publicidad comercial frente a anuncios propios de OSAP.</li></ul>
 <p>En OSAP puede resultar interesante explicar en qué contextos musicales se ha difundido una campaña: por ejemplo, fichas de obras, personas, clasificaciones o idiomas. El informe solo debe mostrar dimensiones que estén realmente registradas y que puedan interpretarse de forma estable. No debe deducir intereses personales ni crear perfiles de visitantes.</p>
-<h2>4. Cómo debería ser el informe para el anunciante</h2>
-<p>La evolución recomendada es un informe por pedido y campaña, con un resumen y un detalle descargable:</p>
+<h2>4. Cómo utilizar el informe del panel</h2>
+<ol><li>Abre «Informes y estadísticas» en el panel.</li><li>Selecciona el periodo. Si no indicas fechas en la API, se utiliza por defecto una ventana de 30 días; el panel propone inicialmente los últimos 30 días.</li><li>Si lo necesitas, limita el resultado a un anunciante, pedido o campaña. Puedes separar publicidad comercial y anuncios propios de OSAP.</li><li>Aplica filtros de aplicación, tipo de página, ubicación e idioma.</li><li>Elige una dimensión para el desglose: aplicación, página, ubicación, idioma, tipo de entidad, formato, campaña o anunciante.</li><li>Revisa los indicadores y pulsa «Exportar CSV» para obtener el resumen, el desglose y la actividad diaria.</li></ol>
+<p>El informe presenta las fechas en UTC. La fecha de entrega se utiliza para contar entregas y la fecha del evento para contar impresiones y clics; por eso, una entrega y su confirmación pueden aparecer en días distintos.</p>
+<p>La evolución recomendada para una siguiente versión es un informe de cliente con identidad visual, filtros guardados y acceso limitado a los pedidos del anunciante:</p>
 <table><tr><th>Bloque</th><th>Contenido</th></tr>
 <tr><td>Identificación</td><td>Anunciante, pedido, campaña, creatividad y periodo.</td></tr>
 <tr><td>Resumen</td><td>Entregas, impresiones registradas, clics registrados y CTR.</td></tr>
@@ -35,15 +37,15 @@
 <tr><td>Distribución</td><td>Desglose por página, ubicación, idioma y formato.</td></tr>
 <tr><td>Economía informativa</td><td>Modelo contratado, tarifa, presupuesto acordado y consumo técnico registrado, separados de factura y pagos.</td></tr>
 <tr><td>Notas metodológicas</td><td>Explicar qué significa una impresión y qué no se mide.</td></tr></table>
-<h2>5. Requisitos antes de programar el cuadro de mando</h2>
+<h2>5. Mejoras que quedan pendientes</h2>
 <ol>
 <li>Definir filtros comunes: periodo, anunciante, pedido, campaña y creatividad.</li>
 <li>Definir la zona horaria de presentación. Los registros se almacenan como fechas de evento/entrega; no se debe agrupar por día local sin explicitar la conversión.</li>
 <li>Calcular los totales desde <code>ad_deliveries</code> y <code>ad_events</code>, sin alterar el histórico ni contar dos veces una confirmación idempotente.</li>
 <li>Separar los anuncios propios y los comerciales.</li>
 <li>Mostrar cuándo una cifra es un recuento de registros y cuándo es un cálculo derivado.</li>
-<li>Permitir exportación CSV como primera salida sencilla; PDF puede añadirse después.</li>
-<li>Proteger los informes por anunciante: cada cliente solo debe acceder a sus propios pedidos. Esta autorización no existe todavía en el panel actual.</li>
+<li>Incorporar PDF y formatos de presentación comercial después de validar el uso del CSV.</li>
+<li>Crear un portal de anunciante separado y protegerlo para que cada cliente solo pueda consultar sus propios pedidos. El informe actual forma parte del panel administrativo y no debe compartirse con clientes.</li>
 </ol>
 <h2>6. Lo que no se debe prometer</h2>
 <ul><li>Usuarios únicos, alcance o frecuencia real de personas: el identificador opaco se utiliza para límites de campaña, pero no convierte el sistema en una medición certificada de audiencia.</li><li>Viewability, tiempo en pantalla, visibilidad en viewport o atención del visitante.</li><li>Conversiones, ventas, registros o ingresos en el sitio del anunciante.</li><li>Datos demográficos o perfiles personales.</li><li>Reproducciones de vídeo verificadas.</li></ul>
