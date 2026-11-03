@@ -81,6 +81,8 @@ def _apply_event_filters(query, start_dt, end_dt, advertiser_id, order_id, campa
         query = query.where(Campaign.order_id == order_id)
     if campaign_id is not None:
         query = query.where(Campaign.id == campaign_id)
+    if creative_id is not None:
+        query = query.where(AdDelivery.creative_id == creative_id)
     if ad_kind == "house":
         query = query.where(Campaign.is_house_ad.is_(True))
     elif ad_kind == "commercial":
@@ -126,7 +128,7 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
         .outerjoin(AdOrder, AdOrder.id == Campaign.order_id)
     )
     event_base = _apply_event_filters(
-        event_base, start_dt, end_dt, advertiser_id, order_id, campaign_id, ad_kind,
+        event_base, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
         application, page_type, placement, language,
     )
     impressions, clicks, charges = db.execute(event_base).one()
