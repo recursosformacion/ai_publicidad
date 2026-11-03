@@ -161,8 +161,15 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
         charges = None
 
     dimension_expr, dimension_name = DIMENSIONS[dimension]
+    # Campaign and creative names are editable and not unique. Keep their IDs
+    # in the grouping key so equal labels never merge separate records.
+    dimension_id_expr = Campaign.id if dimension == "campaign" else (
+        Creative.id if dimension == "creative" else dimension_expr
+    )
+    has_stable_dimension_id = dimension in {"campaign", "creative"}
     delivery_group = (
-        select(dimension_expr.label("label"), func.count(AdDelivery.id).label("deliveries"))
+        select(dimension_expr.label("label"), dimension_id_expr.label("dimension_id"),
+               func.count(AdDelivery.id).label("deliveries"))
         .select_from(AdDelivery)
         .join(Campaign, Campaign.id == AdDelivery.campaign_id)
         .outerjoin(AdOrder, AdOrder.id == Campaign.order_id)
@@ -176,11 +183,12 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
     delivery_group = _apply_delivery_filters(
         delivery_group, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
         application, page_type, placement, language, entity_type, entity_id,
-    ).group_by(dimension_expr).order_by(func.count(AdDelivery.id).desc()).limit(100)
+    ).group_by(dimension_expr, dimension_id_expr).order_by(func.count(AdDelivery.id).desc()).limit(100)
 
     event_group = (
         select(
             dimension_expr.label("label"),
+            dimension_id_expr.label("dimension_id"),
             func.sum(case((AdEvent.event_type == "impression", 1), else_=0)).label("impressions"),
             func.sum(case((AdEvent.event_type == "click", 1), else_=0)).label("clicks"),
             func.coalesce(func.sum(AdEvent.charge_microcents), 0).label("charge_microcents"),
@@ -199,17 +207,26 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
     event_group = _apply_event_filters(
         event_group, start_dt, end_dt, advertiser_id, order_id, campaign_id, creative_id, ad_kind,
         application, page_type, placement, language, entity_type, entity_id,
-    ).group_by(dimension_expr).order_by(func.sum(case((AdEvent.event_type == "impression", 1), else_=0)).desc()).limit(100)
+    ).group_by(dimension_expr, dimension_id_expr).order_by(func.sum(case((AdEvent.event_type == "impression", 1), else_=0)).desc()).limit(100)
 
     grouped: dict[str, dict] = {}
     for row in db.execute(delivery_group):
         label = str(row.label or "(sin dato)")
-        grouped[label] = {"label": label, "deliveries": int(row.deliveries or 0),
-                          "impressions": 0, "clicks": 0, "charge_microcents": 0}
+        group_key = str(row.dimension_id) if has_stable_dimension_id else label
+        item = grouped.setdefault(group_key, {
+            "label": label, "deliveries": 0, "impressions": 0, "clicks": 0, "charge_microcents": 0,
+        })
+        if has_stable_dimension_id:
+            item["id"] = int(row.dimension_id)
+        item["deliveries"] = int(row.deliveries or 0)
     for row in db.execute(event_group):
         label = str(row.label or "(sin dato)")
-        item = grouped.setdefault(label, {"label": label, "deliveries": 0,
-                                          "impressions": 0, "clicks": 0, "charge_microcents": 0})
+        group_key = str(row.dimension_id) if has_stable_dimension_id else label
+        item = grouped.setdefault(group_key, {
+            "label": label, "deliveries": 0, "impressions": 0, "clicks": 0, "charge_microcents": 0,
+        })
+        if has_stable_dimension_id:
+            item["id"] = int(row.dimension_id)
         item["impressions"] = int(row.impressions or 0)
         item["clicks"] = int(row.clicks or 0)
         item["charge_microcents"] = int(row.charge_microcents or 0)
