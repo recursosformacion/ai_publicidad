@@ -109,3 +109,9 @@ No se necesita todavía portal de anunciante, PDF fiscal, pasarela de pago ni in
 7. ¿Qué conservación y trazabilidad exige el marco fiscal aplicable?
 
 Hasta resolver estas decisiones, la propuesta debe mantenerse como diseño y no debe generar nuevas tablas ni modificar la base de datos.
+
+## 9. Rendimiento y operación
+
+Los informes filtran por `AdDelivery.delivered_at` y `AdEvent.occurred_at`. El modelo actual indexa la relación de eventos con entregas, pero las fechas no aparecen indexadas en el modelo consultado. Antes de crear índices adicionales hay que medir el volumen real y revisar el plan de ejecución en una copia representativa de la base de datos. Si los recorridos por periodo hacen escaneos completos, valorar índices de fecha en ambas tablas mediante una migración reversible y una ventana de mantenimiento; no ejecutar cambios de esquema directamente en producción sin copia de seguridad y revisión.
+
+La preliquidación también debe paginar o procesar por lotes el detalle de eventos: no cargar todos los IDs de un pedido grande en memoria. El cierre debe ser transaccional, con una estrategia de bloqueo compatible con el motor SQL utilizado.
