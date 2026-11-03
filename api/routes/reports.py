@@ -129,6 +129,23 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
     impressions, clicks, charges = db.execute(event_base).one()
     impressions, clicks, charges = int(impressions or 0), int(clicks or 0), int(charges or 0)
 
+    currency_query = (
+        select(AdOrder.currency)
+        .select_from(AdDelivery)
+        .join(Campaign, Campaign.id == AdDelivery.campaign_id)
+        .join(AdOrder, AdOrder.id == Campaign.order_id)
+        .where(AdOrder.currency.is_not(None))
+    )
+    currency_query = _apply_delivery_filters(
+        currency_query, start_dt, end_dt, advertiser_id, order_id, campaign_id, ad_kind,
+        application, page_type, placement, language,
+    ).distinct()
+    currencies = sorted(set(db.scalars(currency_query).all()))
+    charge_currency = currencies[0] if len(currencies) == 1 else None
+    if len(currencies) > 1:
+        # Never add monetary amounts from different currencies into one total.
+        charges = None
+
     dimension_expr, dimension_name = DIMENSIONS[dimension]
     delivery_group = (
         select(dimension_expr.label("label"), func.count(AdDelivery.id).label("deliveries"))
@@ -179,6 +196,9 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
         item["clicks"] = int(row.clicks or 0)
         item["charge_microcents"] = int(row.charge_microcents or 0)
     breakdown = sorted(grouped.values(), key=lambda item: (item["deliveries"], item["impressions"], item["clicks"]), reverse=True)
+    if len(currencies) > 1:
+        for item in breakdown:
+            item["charge_microcents"] = None
 
     delivery_days = (
         select(func.date(AdDelivery.delivered_at).label("day"), func.count(AdDelivery.id))
@@ -220,6 +240,10 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
         item["clicks"] = int(day_clicks or 0)
         item["charge_microcents"] = int(day_charges or 0)
 
+    if len(currencies) > 1:
+        for item in days.values():
+            item["charge_microcents"] = None
+
     return {
         "period": {"start_date": start.isoformat(), "end_date": end.isoformat(), "timezone": "UTC"},
         "filters": {"advertiser_id": advertiser_id, "order_id": order_id, "campaign_id": campaign_id,
@@ -229,6 +253,8 @@ def _report_data(db: Session, *, start_date: date | None, end_date: date | None,
             "deliveries": deliveries, "impressions": impressions, "clicks": clicks,
             "ctr_percent": round(clicks / impressions * 100, 4) if impressions else None,
             "charge_microcents": charges,
+            "charge_currency": charge_currency,
+            "multiple_currencies": len(currencies) > 1,
         },
         "daily": [days[key] for key in sorted(days)],
         "dimension": dimension_name,
@@ -295,16 +321,16 @@ def report_export_csv(
     output = StringIO()
     writer = csv.writer(output, delimiter=";")
     writer.writerow(["Tipo", "Periodo UTC", "Dimensión", "Elemento", "Entregas", "Impresiones registradas",
-                     "Clics registrados", "CTR (%)", "Cargo técnico (microcéntimos)"])
+                     "Clics registrados", "CTR (%)", "Moneda", "Cargo técnico (microcéntimos; vacío si hay varias monedas)"])
     summary = data["summary"]
     writer.writerow(["resumen", f'{data["period"]["start_date"]}–{data["period"]["end_date"]}', "", "TOTAL",
                      summary["deliveries"], summary["impressions"], summary["clicks"],
                      summary["ctr_percent"] if summary["ctr_percent"] is not None else "",
-                     summary["charge_microcents"]])
+                     summary["charge_currency"] or "", summary["charge_microcents"] if summary["charge_microcents"] is not None else ""])
     for row in data["breakdown"]:
         ctr = round(row["clicks"] / row["impressions"] * 100, 4) if row["impressions"] else ""
         writer.writerow(["desglose", "", data["dimension"], row["label"], row["deliveries"],
-                         row["impressions"], row["clicks"], ctr, row["charge_microcents"]])
+                         row["impressions"], row["clicks"], ctr, data["summary"]["charge_currency"] or "", row["charge_microcents"] if row["charge_microcents"] is not None else ""])
     for row in data["daily"]:
         ctr = round(row["clicks"] / row["impressions"] * 100, 4) if row["impressions"] else ""
         writer.writerow(["diario", row["date"], "", "", row["deliveries"], row["impressions"],
