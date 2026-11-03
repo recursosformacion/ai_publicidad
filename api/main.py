@@ -16,6 +16,7 @@ from api.routes.events import router as events_router
 from api.routes.health import router as health_router
 from api.routes.layout_lab import router as layout_lab_router
 from api.routes.metadata import router as metadata_router
+from api.routes.reports import router as reports_router
 from domain.models import Base
 from infrastructure.config import get_settings
 from infrastructure.database import engine
@@ -46,6 +47,7 @@ app.include_router(layout_lab_router)
 app.include_router(metadata_router, prefix="/api/v1")
 app.include_router(ads_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
+app.include_router(reports_router, prefix="/api/v1")
 app.include_router(commercial_admin_router, prefix="/api/v1")
 app.include_router(admin_ui_router)
 app.include_router(events_router, prefix="/api/v1")
