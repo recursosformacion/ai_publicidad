@@ -450,3 +450,15 @@ En PowerShell, deja `AI_PUBLICIDAD_DATABASE_URL` vacía cuando quieras usar el `
 ---
 
 **Estado:** diseño inicial. La lista de tipos de página, los contratos comerciales y los endpoints se deben contrastar con la implementación real de `osap-app` antes de cerrar el contrato de integración.
+
+## 14. Liberación a producción
+
+`scripts/release.ps1` empaqueta el servicio, ejecuta los tests y despliega en el host `RemoteIA`:
+
+```powershell
+pwsh -File scripts/release.ps1 -DryRun
+pwsh -File scripts/release.ps1 -Apply -MaintenanceScript ..\osap-api\web\scripts\maintenance.ps1
+```
+
+Antes de modificar producción hace backup del código y de `OSAP_PUBLICIDAD`, instala las dependencias del `pyproject.toml`, ejecuta `alembic upgrade head`, reinicia `ai-publicidad` y comprueba `/health`. Si algo falla, restaura el código y la base de datos. Sin `-Apply` no se escribe nada.
+
