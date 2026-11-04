@@ -36,6 +36,11 @@ def test_admin_panel_is_served_and_contains_navigation_and_crud_controls():
         "controls[key].disabled=readOnly",
         "specsForHistory(row)",
         'key:"ad_format_ids"',
+        '["html_package","HTML (ZIP)"]',
+        'id="package-upload"',
+        "uploadPackage",
+        'id="image-upload"',
+        "uploadImage",
         'data-section="ad-formats"',
         'data-section="brands"',
         'key:"brand_id"',
@@ -50,6 +55,20 @@ def test_admin_panel_is_served_and_contains_navigation_and_crud_controls():
         "archived",
     ):
         assert marker in html
+
+
+def test_admin_panel_uses_osap_favicon_and_funding_link():
+    with TestClient(app) as client:
+        page = client.get("/admin")
+        icon = client.get("/favicon.ico")
+
+    assert page.status_code == 200
+    assert '<link rel="icon" type="image/x-icon" href="/favicon.ico">' in page.text
+    assert "Financiar OSAP" in page.text
+    assert "https://app.openmusicrepository.com/support" in page.text
+    assert icon.status_code == 200
+    assert icon.headers["content-type"] == "image/x-icon"
+    assert icon.content
 
 
 def test_history_sections_are_read_only_in_the_web_panel():

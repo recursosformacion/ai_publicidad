@@ -77,6 +77,7 @@ class AdPayload(BaseModel):
     ad_format_name: str | None = None
     ad_width: int | None = None
     ad_height: int | None = None
+    package_url: str | None = None
 
 
 class ImpressionRequest(BaseModel):

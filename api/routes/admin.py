@@ -1,6 +1,6 @@
 """Administration API for campaign configuration and read-only history."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -15,10 +15,15 @@ from api.admin_schemas import (
     CampaignInput,
     CampaignRead,
     CreativeInput,
+    CreativePackageRead,
     CreativeRead,
     TargetingRuleInput,
     TargetingRuleRead,
 )
+from application.images import ImageProcessingError, optimize_image
+from application.images import image_url as public_image_url
+from application.packages import PackageValidationError, validate_and_store_package
+from application.security import require_service_token
 from domain.models import (
     AdDelivery,
     AdEvent,
@@ -27,11 +32,12 @@ from domain.models import (
     Brand,
     Campaign,
     Creative,
+    CreativePackage,
     TargetingRule,
     brand_competitors,
     creative_ad_formats,
 )
-from application.security import require_service_token
+from infrastructure.config import get_settings
 from infrastructure.database import get_db
 
 # Authorization is intentionally deferred to a later phase.
@@ -441,6 +447,98 @@ def get_creative(creative_id: int, db: Session = Depends(get_db)) -> Creative:
     if creative is None:
         raise _not_found("Creatividad", creative_id)
     return creative
+
+
+@router.post(
+    "/creatives/{creative_id}/package",
+    response_model=CreativePackageRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def upload_creative_package(
+    creative_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> CreativePackage:
+    creative = db.get(Creative, creative_id)
+    if creative is None:
+        raise _not_found("Creatividad", creative_id)
+    if creative.format != "html_package":
+        raise HTTPException(
+            status_code=409,
+            detail="La creatividad debe tener formato html_package antes de subir un ZIP",
+        )
+
+    settings = get_settings()
+    payload = file.file.read(settings.package_max_archive_bytes + 1)
+    try:
+        stored = validate_and_store_package(
+            payload,
+            file.filename,
+            settings.package_root,
+            max_archive_bytes=settings.package_max_archive_bytes,
+            max_extracted_bytes=settings.package_max_extracted_bytes,
+            max_files=settings.package_max_files,
+        )
+    except PackageValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    package = db.scalar(
+        select(CreativePackage).where(CreativePackage.creative_id == creative_id)
+    )
+    if package is None:
+        package = CreativePackage(creative_id=creative_id)
+        db.add(package)
+    package.sha256 = stored.sha256
+    package.size_bytes = stored.size_bytes
+    package.compressed_size = stored.compressed_size
+    package.entrypoint = stored.entrypoint
+    package.original_filename = stored.original_filename
+    db.commit()
+    db.refresh(package)
+    return package
+
+
+@router.post("/creatives/{creative_id}/image", status_code=status.HTTP_201_CREATED)
+def upload_creative_image(
+    creative_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> dict[str, str | int]:
+    creative = db.get(Creative, creative_id)
+    if creative is None:
+        raise _not_found("Creatividad", creative_id)
+    if creative.format not in {"image", "image_text", "responsive"}:
+        raise HTTPException(
+            status_code=409,
+            detail="La creatividad debe usar formato de imagen para subir una imagen",
+        )
+    if not creative.alt_text:
+        raise HTTPException(
+            status_code=422,
+            detail="Rellena el texto alternativo antes de subir la imagen",
+        )
+    settings = get_settings()
+    if not (file.content_type or "").startswith("image/"):
+        raise HTTPException(status_code=400, detail="El archivo no es una imagen")
+    payload = file.file.read(settings.image_max_bytes + 1)
+    try:
+        stored = optimize_image(
+            payload,
+            settings.image_root,
+            max_dimension=settings.image_max_dimension,
+            quality=settings.image_webp_quality,
+        )
+    except ImageProcessingError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    creative.image_url = public_image_url(settings, stored)
+    db.commit()
+    db.refresh(creative)
+    return {
+        "url": creative.image_url,
+        "sha256": stored.sha256,
+        "size_bytes": stored.size_bytes,
+        "content_type": stored.content_type,
+    }
 
 
 @router.put("/creatives/{creative_id}", response_model=CreativeRead)

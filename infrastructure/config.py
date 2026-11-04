@@ -89,6 +89,16 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("AI_PUBLICIDAD_OSAP_CONFIG", "OSAP_CONFIG"),
     )
     public_base_url: str = "http://127.0.0.1:8305"
+    package_root: str = "data/packages"
+    package_content_base_url: str | None = None
+    package_frame_ancestors: str = "https://app.openmusicrepository.com"
+    package_max_archive_bytes: int = 2_000_000
+    package_max_extracted_bytes: int = 10_000_000
+    package_max_files: int = 100
+    image_root: str = "data/media"
+    image_max_bytes: int = 5_000_000
+    image_max_dimension: int = 2000
+    image_webp_quality: int = 88
     service_token: str = ""
     visitor_hash_secret: str = ""
     enable_layout_lab: bool = False
@@ -129,6 +139,10 @@ class Settings(BaseSettings):
                 raise ValueError("La base de datos de publicidad debe llamarse OSAP_PUBLICIDAD.")
             if not self.public_base_url.startswith("https://"):
                 raise ValueError("AI_PUBLICIDAD_PUBLIC_BASE_URL debe usar HTTPS en producción")
+            if self.package_content_base_url and not self.package_content_base_url.startswith("https://"):
+                raise ValueError(
+                    "AI_PUBLICIDAD_PACKAGE_CONTENT_BASE_URL debe usar HTTPS en producción"
+                )
         return self
 
 

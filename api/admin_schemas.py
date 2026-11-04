@@ -10,7 +10,7 @@ from application.security import validate_destination
 
 CampaignStatus = Literal["draft", "active", "paused", "completed", "cancelled", "archived"]
 CreativeStatus = Literal["draft", "approved", "paused", "rejected", "archived"]
-CreativeFormat = Literal["image", "text", "image_text", "responsive"]
+CreativeFormat = Literal["image", "text", "image_text", "responsive", "html_package"]
 RuleType = Literal["application", "page_type", "placement", "language", "entity_type", "entity_id"]
 RuleEffect = Literal["include", "exclude"]
 AdFormatDevice = Literal["desktop", "mobile", "both"]
@@ -233,9 +233,19 @@ class CreativeInput(BaseModel):
         return self
 
 
+class CreativePackageRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    sha256: str
+    size_bytes: int
+    compressed_size: int
+    entrypoint: str
+    original_filename: str | None = None
+
+
 class CreativeRead(CreativeInput):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    package: CreativePackageRead | None = None
 
 
 

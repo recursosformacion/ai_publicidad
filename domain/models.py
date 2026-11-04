@@ -178,10 +178,37 @@ class Creative(Base):
         back_populates="creatives",
         order_by="AdFormat.width, AdFormat.height",
     )
+    package: Mapped["CreativePackage | None"] = relationship(
+        back_populates="creative",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     @property
     def ad_format_ids(self) -> list[int]:
         return [ad_format.id for ad_format in self.ad_formats]
+
+
+class CreativePackage(Base):
+    """Immutable static ZIP package attached to an HTML-package creative."""
+
+    __tablename__ = "creative_packages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    creative_id: Mapped[int] = mapped_column(
+        ForeignKey("creatives.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    compressed_size: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    entrypoint: Mapped[str] = mapped_column(String(120), default="index.html", nullable=False)
+    original_filename: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    creative: Mapped[Creative] = relationship(back_populates="package")
 
 
 class TargetingRule(Base):

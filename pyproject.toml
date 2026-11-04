@@ -14,6 +14,8 @@ dependencies = [
   "pydantic>=2.6",
   "pydantic-settings>=2.2",
   "python-dotenv>=1.0",
+  "python-multipart>=0.0.9",
+  "Pillow>=10,<12",
   "sqlalchemy>=2.0",
   "alembic>=1.13",
   "pymysql>=1.1",
@@ -36,6 +38,7 @@ packages = ["api", "domain", "application", "infrastructure"]
 [tool.hatch.build.targets.wheel.force-include]
 "api/static/admin.html" = "api/static/admin.html"
 "api/static/layout_lab.html" = "api/static/layout_lab.html"
+"api/static/favicon.ico" = "api/static/favicon.ico"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

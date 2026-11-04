@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from api.schemas import AdArea, AdPayload, ComposeAdRequest, FormatRequest, ServeAdRequest
+from application.packages import package_content_url
 from application.security import require_service_token, validate_destination
 from application.commercial import campaign_business_eligible, charge_microcents_for_event, visitor_key_hash
 from domain.models import (
@@ -278,6 +279,13 @@ def _compose_options(
                 validate_destination(creative.image_url)
             except ValueError:
                 continue
+        if creative.format == "html_package":
+            if creative.package is None:
+                continue
+            if package_content_url(
+                get_settings(), creative.package.sha256, creative.package.entrypoint
+            ) is None:
+                continue
 
         assigned_formats = [item for item in creative.ad_formats if item.is_active]
         if fixed_format is not None:
@@ -445,6 +453,44 @@ def _choose_layout(
     return None
 
 
+def _render_package_card(
+    creative: Creative,
+    option: _AdOption,
+    token: str,
+    position: tuple[int, int],
+    click_url: str,
+    package_url: str,
+    kind: str,
+) -> str:
+    """Render an isolated static package with a trusted click overlay."""
+    x, y = position
+    width, height = option.width, option.height
+    title = html.escape(creative.title, quote=True)
+    image_url = html.escape(package_url, quote=True)
+    link = html.escape(click_url, quote=True)
+    fmt_code = html.escape(option.ad_format.code, quote=True)
+    return (
+        '<div class="ap-ad-card ap-ad-html" '
+        f'data-ad-id="{creative.id}" data-kind="{kind}" data-format="{fmt_code}" '
+        f'data-x="{x}" data-y="{y}" data-width="{width}" data-height="{height}" '
+        f'data-impression-id="{html.escape(token, quote=True)}" '
+        f'title="{title}" '
+        f'style="position:absolute;left:{x}px;top:{y}px;width:{width}px;height:{height}px;'
+        'box-sizing:border-box;overflow:hidden;border:1px solid #ced9e4;border-radius:8px;'
+        'background:#fff">'
+        f'<iframe src="{image_url}" title="{title}" loading="lazy" '
+        'referrerpolicy="no-referrer" sandbox="" allow="" '
+        'style="display:block;width:100%;height:100%;border:0;background:#fff"></iframe>'
+        f'<a href="{link}" target="_blank" rel="sponsored noopener noreferrer" '
+        f'aria-label="{title}" '
+        'style="position:absolute;inset:0;z-index:2;display:block"></a>'
+        '<span style="position:absolute;left:7px;top:4px;z-index:3;pointer-events:none;'
+        'font-size:9px;letter-spacing:.04em;text-transform:uppercase;color:#6b7b8c">'
+        "Publicidad</span>"
+        "</div>"
+    )
+
+
 def _render_layout_html(
     layout: _Layout | None,
     area: AdArea,
@@ -518,7 +564,7 @@ def _render_layout_html(
 
     count = len(layout.items)
     rendered: list[str] = []
-    for index, (option, token, position) in enumerate(zip(layout.items, tokens, positions, strict=True)):
+    for option, token, position in zip(layout.items, tokens, positions, strict=True):
         creative = option.creative
         x, y = position
         click_url = f"{settings.public_base_url.rstrip('/')}/r/{token}"
@@ -527,6 +573,17 @@ def _render_layout_html(
         link = html.escape(click_url, quote=True)
         fmt_code = html.escape(option.ad_format.code, quote=True)
         kind = "house" if option.campaign.is_house_ad else "commercial"
+        if creative.format == "html_package" and creative.package is not None:
+            package_url = package_content_url(
+                settings, creative.package.sha256, creative.package.entrypoint
+            )
+            if package_url:
+                rendered.append(
+                    _render_package_card(
+                        creative, option, token, position, click_url, package_url, kind
+                    )
+                )
+                continue
         alt = html.escape(creative.alt_text or "", quote=True)
         image_html = ""
         if creative.image_url:
@@ -685,8 +742,15 @@ def serve_ad(request: ServeAdRequest, db: Session = Depends(get_db)) -> AdPayloa
                     continue
                 if creative.format not in {request.format.type, "responsive"}:
                     continue
+                if creative.format == "html_package" and request.format.type != "html_package":
+                    continue
                 if creative.language not in {request.page.language, "mul", "es"}:
                     continue
+                if creative.format == "html_package":
+                    if creative.package is None or package_content_url(
+                        get_settings(), creative.package.sha256, creative.package.entrypoint
+                    ) is None:
+                        continue
 
                 assigned_formats = list(creative.ad_formats)
                 matched_format: AdFormat | None = None
@@ -753,6 +817,11 @@ def serve_ad(request: ServeAdRequest, db: Session = Depends(get_db)) -> AdPayloa
     db.refresh(delivery)
 
     settings = get_settings()
+    package_url = (
+        package_content_url(settings, creative.package.sha256, creative.package.entrypoint)
+        if creative.format == "html_package" and creative.package is not None
+        else None
+    )
     return AdPayload(
         ad_id=creative.id,
         impression_id=token,
@@ -769,4 +838,5 @@ def serve_ad(request: ServeAdRequest, db: Session = Depends(get_db)) -> AdPayloa
         ad_format_name=matched_format.name if matched_format is not None else None,
         ad_width=matched_format.width if matched_format is not None else None,
         ad_height=matched_format.height if matched_format is not None else None,
+        package_url=package_url,
     )

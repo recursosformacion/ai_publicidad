@@ -81,10 +81,29 @@ Formatos iniciales:
 - `text`: título, texto y enlace.
 - `image_text`: imagen, título y texto.
 - `responsive`: creatividad adaptable a tamaños previamente autorizados.
+- `html_package`: ZIP estático con `index.html`, CSS e imágenes; se sirve en un iframe aislado, no se inserta HTML en la página de OSAP.
+
+### Paquetes HTML estáticos
+
+Un paquete se sube desde el panel o con `POST /api/v1/admin/creatives/{id}/package` (multipart, campo `file`) una vez que la creatividad tiene formato `html_package`. El ZIP debe contener `index.html` en la raíz y solo admite HTML, CSS, imágenes y fuentes; no se aceptan JavaScript, enlaces simbólicos, rutas `..` ni ficheros fuera de los límites configurados.
+
+El contenido se guarda por hash en `AI_PUBLICIDAD_PACKAGE_ROOT` y se sirve desde `AI_PUBLICIDAD_PACKAGE_CONTENT_BASE_URL`, que en producción debe ser un origen separado (por ejemplo, un subdominio con su propio vhost) y no el de la aplicación. La respuesta aplica CSP con `script-src 'none'` y el iframe usa `sandbox=""`; los clics pasan por el overlay de seguimiento `/r/{token}`. En desarrollo, `restart-dev.ps1` configura el origen de contenido y el directorio de paquetes.
 
 Los tamaños se catalogan en `ad_formats`, separados del tipo de creatividad. El catálogo inicial contiene `728×90` (banner de escritorio), `320×50` (banner móvil), `300×250` (rectángulo), `160×600` (vertical) y `200×200` (cuadrado compacto solicitado para el diseño OSAP). Las notas del catálogo explican el efecto estructural de cada medida: el rectángulo de 300×250 puede centrarse, pero una columna lateral estrecha puede requerir ampliación; el vertical de 160×600 necesita al menos ese ancho y no implica que ya exista reproducción de vídeo.
 
 Un anuncio puede asociarse a varios formatos estándar. El banner institucional de OpenMusicRepository se asocia a los dos tamaños de cabecera: escritorio y móvil. Cuando se solicitan dimensiones, la entrega prioriza un anuncio asignado exactamente a ese tamaño y dispositivo; si no lo hay, puede usar una creatividad genérica compatible como reserva, pero no un anuncio fijo de dimensiones distintas. Los clientes deben enviar `width` y `height` juntos; sin dimensiones, solo se entregan creatividades genéricas no asociadas a tamaños fijos.
+
+### Subida de imágenes
+
+El panel permite subir una imagen para creatividades `image`, `image_text` o `responsive`. El endpoint `POST /api/v1/admin/creatives/{id}/image` acepta JPEG/JFIF, PNG, WebP o GIF y guarda una versión optimizada:
+
+- JPEG/JFIF y PNG se convierten a WebP (PNG y transparencias sin pérdida).
+- Los GIF animados se conservan sin perder fotogramas.
+- Se limita la dimensión máxima a `AI_PUBLICIDAD_IMAGE_MAX_DIMENSION` (2000 px por defecto) y se aplica `AI_PUBLICIDAD_IMAGE_WEBP_QUALITY` (88 por defecto).
+- El fichero se guarda por hash en `AI_PUBLICIDAD_IMAGE_ROOT` y se sirve inmutable en `/media/{hash}.webp`.
+- La creatividad debe tener `alt_text` antes de subir la imagen.
+
+La conversión a WebP reduce peso y artefactos de compresión, pero no recupera nitidez perdida en el origen. Para texto conviene generar una imagen mayor y no ampliarla después.
 
 ## Motor de composición automática
 
