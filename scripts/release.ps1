@@ -111,7 +111,7 @@ try {
     }
 
     Write-Host "== Backup producción ==" -ForegroundColor Cyan
-    Invoke-Remote "set -e; mkdir -p '$backupDir'; cd '$RemoteDir'; tar -czf '$backupDir/code.tgz' api application domain infrastructure scripts alembic.ini pyproject.toml; sudo -n mysqldump --single-transaction OSAP_PUBLICIDAD | gzip > '$backupDir/db.sql.gz'; echo '$backupDir'"
+    Invoke-Remote "set -e; mkdir -p '$backupDir'; cd '$RemoteDir'; tar -czf '$backupDir/code.tgz' --exclude='__pycache__' --exclude='*.pyc' api application domain infrastructure scripts alembic.ini pyproject.toml; sudo -n mysqldump --single-transaction OSAP_PUBLICIDAD | gzip > '$backupDir/db.sql.gz'; echo '$backupDir'"
     $backupReady = $true
 
     Write-Host "== Subiendo release $Version ==" -ForegroundColor Cyan
@@ -136,7 +136,7 @@ try {
     Invoke-Remote "for i in $(seq 1 30); do if curl -fsS http://127.0.0.1:8305/health >/tmp/ai-publicidad-health.json 2>/dev/null; then cat /tmp/ai-publicidad-health.json; exit 0; fi; sleep 1; done; echo health_failed; exit 1"
 
     Write-Host "== Versión instalada ==" -ForegroundColor Cyan
-    Invoke-Remote "cd '$RemoteDir' && .venv/bin/python -c 'import importlib.metadata as m; print(m.version(\"ai-publicidad\"))'"
+    Invoke-Remote "cd '$RemoteDir' && .venv/bin/pip show ai-publicidad | sed -n 's/^Version: //p'"
     Write-Host "Release $Version OK. Backup: $backupDir" -ForegroundColor Green
 }
 catch {
@@ -144,7 +144,7 @@ catch {
     if ($deployed -and $backupReady) {
         Write-Host "== Rollback ==" -ForegroundColor Yellow
         try {
-            Invoke-Remote "set -e; sudo -n systemctl stop ai-publicidad || true; cd '$RemoteDir'; tar -xzf '$backupDir/code.tgz'; zcat '$backupDir/db.sql.gz' | sudo -n mysql OSAP_PUBLICIDAD; sudo -n systemctl start ai-publicidad"
+            Invoke-Remote "sudo -n systemctl stop ai-publicidad || true; cd '$RemoteDir'; (tar -xzf '$backupDir/code.tgz' --overwrite || true); (zcat '$backupDir/db.sql.gz' | sudo -n mysql OSAP_PUBLICIDAD || true); sudo -n systemctl start ai-publicidad"
             Write-Host "Rollback completado" -ForegroundColor Yellow
         } catch {
             Write-Host "El rollback también falló: $($_.Exception.Message)" -ForegroundColor Red
