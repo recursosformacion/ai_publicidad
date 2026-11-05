@@ -39,7 +39,6 @@ packages = ["api", "domain", "application", "infrastructure"]
 "api/static/admin.html" = "api/static/admin.html"
 "api/static/layout_lab.html" = "api/static/layout_lab.html"
 "api/static/favicon.ico" = "api/static/favicon.ico"
-"api/static/favicon.ico" = "api/static/favicon.ico"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
