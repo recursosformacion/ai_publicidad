@@ -23,7 +23,7 @@ from api.admin_schemas import (
 from application.images import ImageProcessingError, optimize_image
 from application.images import image_url as public_image_url
 from application.packages import PackageValidationError, validate_and_store_package
-from application.security import require_service_token
+from application.auth import require_admin_session
 from domain.models import (
     AdDelivery,
     AdEvent,
@@ -44,7 +44,7 @@ from infrastructure.database import get_db
 router = APIRouter(
     prefix="/admin",
     tags=["administration"],
-    dependencies=[Depends(require_service_token)],
+    dependencies=[Depends(require_admin_session)],
 )
 
 

@@ -5,10 +5,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api.admin_schemas import AdOrderInput, AdOrderRead, AdvertiserInput, AdvertiserRead
+from application.auth import require_admin_session
 from domain.models import AdOrder, Advertiser, Campaign
 from infrastructure.database import get_db
 
-router = APIRouter(prefix="/admin", tags=["commercial administration"])
+router = APIRouter(
+    prefix="/admin",
+    tags=["commercial administration"],
+    dependencies=[Depends(require_admin_session)],
+)
 
 
 def _missing(kind: str, record_id: int) -> HTTPException:

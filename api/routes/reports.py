@@ -10,14 +10,14 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from application.security import require_service_token
+from application.auth import require_admin_session
 from domain.models import AdDelivery, AdEvent, AdFormat, AdOrder, Advertiser, Campaign, Creative
 from infrastructure.database import get_db
 
 router = APIRouter(
     prefix="/admin/reports",
     tags=["advertising reports"],
-    dependencies=[Depends(require_service_token)],
+    dependencies=[Depends(require_admin_session)],
 )
 
 DIMENSIONS = {

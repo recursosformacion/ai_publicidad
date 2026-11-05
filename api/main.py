@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from api.routes.admin import router as admin_router
 from api.routes.admin_ui import router as admin_ui_router
+from api.routes.auth import router as auth_router
 from api.routes.ads import router as ads_router
 from api.routes.clicks import router as clicks_router
 from api.routes.commercial_admin import router as commercial_admin_router
@@ -40,7 +41,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="ai_publicidad",
     description="Servicio independiente de publicidad directa.",
-    version="0.3.1",
+    version="0.4.0",
     lifespan=lifespan,
 )
 
@@ -51,6 +52,7 @@ app.include_router(ads_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
 app.include_router(commercial_admin_router, prefix="/api/v1")
+app.include_router(auth_router)
 app.include_router(admin_ui_router)
 app.include_router(events_router, prefix="/api/v1")
 app.include_router(clicks_router)
