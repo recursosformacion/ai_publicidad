@@ -93,5 +93,5 @@ def image_file(root: str | Path, digest: str, extension: str = ".webp") -> Path 
 
 
 def image_url(settings: Settings, stored: StoredImage) -> str:
-    base = settings.public_base_url
+    base = settings.image_base_url or settings.public_base_url
     return f"{str(base).rstrip('/')}/media/{stored.sha256}{stored.extension}"

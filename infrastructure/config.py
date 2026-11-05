@@ -96,6 +96,7 @@ class Settings(BaseSettings):
     package_max_extracted_bytes: int = 10_000_000
     package_max_files: int = 100
     image_root: str = "data/media"
+    image_base_url: str | None = None
     image_max_bytes: int = 5_000_000
     image_max_dimension: int = 2000
     image_webp_quality: int = 88
