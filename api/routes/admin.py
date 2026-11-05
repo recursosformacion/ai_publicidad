@@ -74,6 +74,35 @@ def _resolve_ad_formats(db: Session, format_ids: list[int]) -> list[AdFormat]:
     return formats
 
 
+def _custom_ad_format(db: Session, width: int, height: int) -> AdFormat:
+    code = f"custom-{width}x{height}"
+    existing = db.scalar(select(AdFormat).where(AdFormat.code == code))
+    if existing is not None:
+        return existing
+    ad_format = AdFormat(
+        code=code,
+        name=f"Personalizado {width}×{height}",
+        width=width,
+        height=height,
+        device="both",
+        category="custom",
+        placement_notes="Tamaño personalizado indicado en la creatividad",
+        is_active=True,
+    )
+    db.add(ad_format)
+    db.flush()
+    return ad_format
+
+
+def _creative_formats(db: Session, format_ids: list[int], width: int | None, height: int | None) -> list[AdFormat]:
+    formats = _resolve_ad_formats(db, format_ids)
+    if width is not None and height is not None:
+        custom = _custom_ad_format(db, width, height)
+        if custom.id not in {item.id for item in formats}:
+            formats.append(custom)
+    return formats
+
+
 # Brands and competitor relationships
 
 def _brand_payload(db: Session, brand: Brand) -> dict[str, object]:
@@ -434,7 +463,9 @@ def create_creative(payload: CreativeInput, db: Session = Depends(get_db)) -> Cr
     if db.get(Campaign, payload.campaign_id) is None:
         raise HTTPException(status_code=404, detail=f"Campaña {payload.campaign_id} no existe")
     creative = Creative(**payload.model_dump(exclude={"ad_format_ids"}))
-    creative.ad_formats = _resolve_ad_formats(db, payload.ad_format_ids)
+    creative.ad_formats = _creative_formats(
+        db, payload.ad_format_ids, payload.custom_width, payload.custom_height
+    )
     db.add(creative)
     db.commit()
     db.refresh(creative)
@@ -498,6 +529,29 @@ def upload_creative_package(
     return package
 
 
+@router.post("/images", status_code=status.HTTP_201_CREATED)
+def upload_image(file: UploadFile = File(...)) -> dict[str, str | int]:
+    settings = get_settings()
+    if not (file.content_type or "").startswith("image/"):
+        raise HTTPException(status_code=400, detail="El archivo no es una imagen")
+    payload = file.file.read(settings.image_max_bytes + 1)
+    try:
+        stored = optimize_image(
+            payload,
+            settings.image_root,
+            max_dimension=settings.image_max_dimension,
+            quality=settings.image_webp_quality,
+        )
+    except ImageProcessingError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        "url": public_image_url(settings, stored),
+        "sha256": stored.sha256,
+        "size_bytes": stored.size_bytes,
+        "content_type": stored.content_type,
+    }
+
+
 @router.post("/creatives/{creative_id}/image", status_code=status.HTTP_201_CREATED)
 def upload_creative_image(
     creative_id: int,
@@ -552,7 +606,9 @@ def replace_creative(
         raise HTTPException(status_code=404, detail=f"Campaña {payload.campaign_id} no existe")
     for key, value in payload.model_dump(exclude={"ad_format_ids"}).items():
         setattr(creative, key, value)
-    creative.ad_formats = _resolve_ad_formats(db, payload.ad_format_ids)
+    creative.ad_formats = _creative_formats(
+        db, payload.ad_format_ids, payload.custom_width, payload.custom_height
+    )
     db.commit()
     db.refresh(creative)
     return creative

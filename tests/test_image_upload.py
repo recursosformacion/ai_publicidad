@@ -66,6 +66,44 @@ def test_upload_converts_to_webp_and_serves_it(client, monkeypatch, tmp_path):
     assert creative.json()["image_url"] == data["url"]
 
 
+def test_generic_image_upload_before_creative_exists(client, monkeypatch, tmp_path):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "image_root", str(tmp_path / "media"))
+    response = client.post(
+        "/api/v1/admin/images",
+        files={"file": ("new.jfif", _jpeg(), "image/jpeg")},
+    )
+    assert response.status_code == 201, response.text
+    data = response.json()
+    assert data["content_type"] == "image/webp"
+    assert client.get(f"/media/{data['sha256']}.webp").status_code == 200
+
+
+def test_custom_size_creates_a_compatible_format(client):
+    campaign_id = _campaign(client)
+    response = client.post(
+        "/api/v1/admin/creatives",
+        json={
+            "campaign_id": campaign_id,
+            "title": "Custom size",
+            "body": "Anuncio de tamaño libre",
+            "format": "text",
+            "language": "es",
+            "destination_url": "https://openmusicrepository.com/",
+            "status": "approved",
+            "custom_width": 321,
+            "custom_height": 123,
+            "ad_format_ids": [],
+        },
+    )
+    assert response.status_code == 201, response.text
+    creative = response.json()
+    assert creative["custom_width"] == 321
+    assert creative["custom_height"] == 123
+    formats = client.get("/api/v1/admin/ad-formats").json()
+    assert any(item["code"] == "custom-321x123" for item in formats)
+
+
 def test_image_upload_requires_image_format_and_alt_text(client, monkeypatch, tmp_path):
     settings = get_settings()
     monkeypatch.setattr(settings, "image_root", str(tmp_path / "media"))

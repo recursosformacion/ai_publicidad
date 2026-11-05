@@ -14,7 +14,7 @@ CreativeFormat = Literal["image", "text", "image_text", "responsive", "html_pack
 RuleType = Literal["application", "page_type", "placement", "language", "entity_type", "entity_id"]
 RuleEffect = Literal["include", "exclude"]
 AdFormatDevice = Literal["desktop", "mobile", "both"]
-AdFormatCategory = Literal["banner", "rectangle", "square", "skyscraper", "video", "other"]
+AdFormatCategory = Literal["banner", "rectangle", "square", "skyscraper", "video", "other", "custom"]
 
 
 class BrandInput(BaseModel):
@@ -197,6 +197,8 @@ class CreativeInput(BaseModel):
     image_url: str | None = None
     alt_text: str | None = Field(default=None, max_length=300)
     format: CreativeFormat = "text"
+    custom_width: int | None = Field(default=None, gt=0, le=5000)
+    custom_height: int | None = Field(default=None, gt=0, le=5000)
     language: str = Field(default="es", min_length=2, max_length=12)
     destination_url: str = Field(min_length=1, max_length=2048)
     status: CreativeStatus = "draft"
@@ -218,6 +220,12 @@ class CreativeInput(BaseModel):
             return validate_destination(value)
         except ValueError as exc:
             raise ValueError(str(exc)) from exc
+
+    @model_validator(mode="after")
+    def validate_custom_size(self) -> "CreativeInput":
+        if (self.custom_width is None) != (self.custom_height is None):
+            raise ValueError("Indica ancho y alto personalizados juntos, o deja ambos vacíos")
+        return self
 
     @model_validator(mode="after")
     def validate_image_fields(self) -> "CreativeInput":

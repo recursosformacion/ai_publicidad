@@ -14,7 +14,11 @@ FAVICON_PATH = STATIC_PATH / "favicon.ico"
 @router.get("/admin", response_class=FileResponse, include_in_schema=False)
 def admin_ui() -> FileResponse:
     """Serve the single-page administration UI."""
-    return FileResponse(ADMIN_HTML_PATH, media_type="text/html; charset=utf-8")
+    return FileResponse(
+        ADMIN_HTML_PATH,
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
 
 
 @router.get("/favicon.ico", response_class=FileResponse, include_in_schema=False)

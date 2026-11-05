@@ -170,6 +170,8 @@ class Creative(Base):
     image_url: Mapped[str | None] = mapped_column(Text)
     alt_text: Mapped[str | None] = mapped_column(String(300))
     format: Mapped[str] = mapped_column(String(30), default="text", nullable=False)
+    custom_width: Mapped[int | None] = mapped_column(Integer)
+    custom_height: Mapped[int | None] = mapped_column(Integer)
     language: Mapped[str] = mapped_column(String(12), default="es", nullable=False)
     destination_url: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="approved", nullable=False)
