@@ -17,7 +17,10 @@ def admin_ui() -> FileResponse:
     return FileResponse(
         ADMIN_HTML_PATH,
         media_type="text/html; charset=utf-8",
-        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "X-Robots-Tag": "noindex, nofollow",
+        },
     )
 
 
