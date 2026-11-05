@@ -19,12 +19,12 @@ dependencies = [
   "sqlalchemy>=2.0",
   "alembic>=1.13",
   "pymysql>=1.1",
+  "httpx>=0.27,<1",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0",
-  "httpx>=0.27",
   "ruff>=0.4",
   "mypy>=1.10",
 ]
@@ -38,6 +38,7 @@ packages = ["api", "domain", "application", "infrastructure"]
 [tool.hatch.build.targets.wheel.force-include]
 "api/static/admin.html" = "api/static/admin.html"
 "api/static/layout_lab.html" = "api/static/layout_lab.html"
+"api/static/favicon.ico" = "api/static/favicon.ico"
 "api/static/favicon.ico" = "api/static/favicon.ico"
 
 [tool.pytest.ini_options]
