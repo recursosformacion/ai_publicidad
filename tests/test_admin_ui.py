@@ -41,6 +41,8 @@ def test_admin_panel_is_served_and_contains_navigation_and_crud_controls():
         "uploadPackage",
         'id="image-upload"',
         "uploadImage",
+        'id="creative-preview"',
+        "refreshCreativePreview",
         'data-section="ad-formats"',
         'data-section="brands"',
         'key:"brand_id"',
