@@ -92,7 +92,7 @@ def test_admin_crud_and_delivery_uses_commercial_then_house_fallback(client, tes
     house_campaign_id = house_campaign.json()["id"]
     house_creative = client.post(
         "/api/v1/admin/creatives",
-        json=_creative_payload(house_campaign_id, "OSAP fallback", format="responsive"),
+        json=_creative_payload(house_campaign_id, "OSAP fallback", format="text"),
     )
     assert house_creative.status_code == 201
     house_creative_id = house_creative.json()["id"]
@@ -330,7 +330,8 @@ def test_initial_house_seed_is_idempotent():
             assert campaign.status == "active"
             assert creative.status == "approved"
             assert creative.language == "es"
-            assert creative.format == "responsive"
+            assert creative.format == "text"
+            assert creative.delivery_mode == "adaptive"
             assert creative.destination_url == "https://openmusicrepository.com/"
             assert seed_house_ads(db) is False
             db.commit()
@@ -362,7 +363,7 @@ def test_standard_ad_format_catalog_and_size_specific_delivery(client, test_engi
         json=_campaign_payload("size-specific commercial", priority=100),
     )
     campaign_id = commercial_campaign.json()["id"]
-    creative_data = _creative_payload(campaign_id, "Rectangle creative", format="responsive")
+    creative_data = _creative_payload(campaign_id, "Rectangle creative", format="text")
     creative_data["ad_format_ids"] = [format_id]
     creative_response = client.post("/api/v1/admin/creatives", json=creative_data)
     assert creative_response.status_code == 201
@@ -376,7 +377,7 @@ def test_standard_ad_format_catalog_and_size_specific_delivery(client, test_engi
     fallback_campaign_id = fallback_campaign.json()["id"]
     fallback_creative = client.post(
         "/api/v1/admin/creatives",
-        json=_creative_payload(fallback_campaign_id, "Generic house creative", format="responsive"),
+        json=_creative_payload(fallback_campaign_id, "Generic house creative", format="text"),
     )
     fallback_creative_id = fallback_creative.json()["id"]
 

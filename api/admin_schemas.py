@@ -10,7 +10,8 @@ from application.security import validate_destination
 
 CampaignStatus = Literal["draft", "active", "paused", "completed", "cancelled", "archived"]
 CreativeStatus = Literal["draft", "approved", "paused", "rejected", "archived"]
-CreativeFormat = Literal["image", "text", "image_text", "responsive", "html_package"]
+CreativeFormat = Literal["image", "text", "image_text", "html_package"]
+DeliveryMode = Literal["fixed", "adaptive", "both"]
 RuleType = Literal["application", "page_type", "placement", "language", "entity_type", "entity_id"]
 RuleEffect = Literal["include", "exclude"]
 AdFormatDevice = Literal["desktop", "mobile", "both"]
@@ -197,6 +198,7 @@ class CreativeInput(BaseModel):
     image_url: str | None = None
     alt_text: str | None = Field(default=None, max_length=300)
     format: CreativeFormat = "text"
+    delivery_mode: DeliveryMode = "both"
     custom_width: int | None = Field(default=None, gt=0, le=5000)
     custom_height: int | None = Field(default=None, gt=0, le=5000)
     language: str = Field(default="es", min_length=2, max_length=12)

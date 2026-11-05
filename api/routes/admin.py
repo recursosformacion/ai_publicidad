@@ -561,7 +561,7 @@ def upload_creative_image(
     creative = db.get(Creative, creative_id)
     if creative is None:
         raise _not_found("Creatividad", creative_id)
-    if creative.format not in {"image", "image_text", "responsive"}:
+    if creative.format not in {"image", "image_text"}:
         raise HTTPException(
             status_code=409,
             detail="La creatividad debe usar formato de imagen para subir una imagen",

@@ -80,8 +80,15 @@ Formatos iniciales:
 - `image`: imagen con texto alternativo obligatorio.
 - `text`: título, texto y enlace.
 - `image_text`: imagen, título y texto.
-- `responsive`: creatividad adaptable a tamaños previamente autorizados.
 - `html_package`: ZIP estático con `index.html`, CSS e imágenes; se sirve en un iframe aislado, no se inserta HTML en la página de OSAP.
+
+La **adaptabilidad no es un tipo de contenido**. Un anuncio declara por separado:
+
+- `format`/tipo de contenido: texto, imagen, imagen + texto o HTML.
+- `ad_format_ids` o tamaño a medida: el tamaño nativo/declarado.
+- `delivery_mode`: `fixed`, `adaptive` o `both`.
+
+Una solicitud fija solo acepta anuncios autorizados como fijos y del tamaño exacto. Una solicitud adaptable solo acepta anuncios autorizados como adaptables, elige tamaños que quepan y **nunca deforma ni estira la imagen**. Si se emiten varias piezas, todas comparten exactamente el mismo tamaño y se respetan campaña, marca y competencia. Una creatividad `both` puede usarse en ambos modos.
 
 ### Paquetes HTML estáticos
 
@@ -91,11 +98,11 @@ El contenido se guarda por hash en `AI_PUBLICIDAD_PACKAGE_ROOT` y se sirve desde
 
 Los tamaños se catalogan en `ad_formats`, separados del tipo de creatividad. El catálogo inicial contiene `728×90` (banner de escritorio), `320×50` (banner móvil), `300×250` (rectángulo), `160×600` (vertical) y `200×200` (cuadrado compacto solicitado para el diseño OSAP). Las notas del catálogo explican el efecto estructural de cada medida: el rectángulo de 300×250 puede centrarse, pero una columna lateral estrecha puede requerir ampliación; el vertical de 160×600 necesita al menos ese ancho y no implica que ya exista reproducción de vídeo.
 
-Un anuncio puede asociarse a varios formatos estándar. El banner institucional de OpenMusicRepository se asocia a los dos tamaños de cabecera: escritorio y móvil. Cuando se solicitan dimensiones, la entrega prioriza un anuncio asignado exactamente a ese tamaño y dispositivo; si no lo hay, puede usar una creatividad genérica compatible como reserva, pero no un anuncio fijo de dimensiones distintas. Los clientes deben enviar `width` y `height` juntos; sin dimensiones, solo se entregan creatividades genéricas no asociadas a tamaños fijos.
+Un anuncio puede declarar varios tamaños como variantes autorizadas; por ejemplo, el banner institucional de OpenMusicRepository declara los dos tamaños de cabecera: escritorio y móvil. Eso no significa deformar una imagen: el motor elige una variante completa que quepa. Cuando se solicitan dimensiones, la entrega prioriza un anuncio asignado exactamente a ese tamaño y dispositivo; si no lo hay, puede usar una creatividad genérica compatible como reserva, pero no un anuncio fijo de dimensiones distintas. Los clientes deben enviar `width` y `height` juntos; sin dimensiones, solo se entregan creatividades genéricas no asociadas a tamaños fijos.
 
 ### Subida de imágenes
 
-El panel permite subir una imagen para creatividades `image`, `image_text` o `responsive`. El endpoint `POST /api/v1/admin/creatives/{id}/image` acepta JPEG/JFIF, PNG, WebP o GIF y guarda una versión optimizada:
+El panel permite subir una imagen para creatividades `image` e `image_text`; una creatividad `responsive` ya no existe: la adaptabilidad se declara en `delivery_mode`. El endpoint `POST /api/v1/admin/creatives/{id}/image` acepta JPEG/JFIF, PNG, WebP o GIF y guarda una versión optimizada:
 
 - JPEG/JFIF y PNG se convierten a WebP (PNG y transparencias sin pérdida).
 - Los GIF animados se conservan sin perder fotogramas.
@@ -109,7 +116,7 @@ La conversión a WebP reduce peso y artefactos de compresión, pero no recupera 
 
 Además de `POST /api/v1/ads/serve` (una creatividad en JSON), el servicio ofrece `POST /api/v1/ads/compose`, que devuelve un fragmento **HTML listo para insertar**. El consumidor puede pedir un formato concreto, indicar un `creative_id` (sin saltarse las reglas de elegibilidad), o reservar un área y permitir que el servicio decida una composición de hasta tres anuncios. Cuando se solicita un `creative_id`, solo se entrega esa creatividad y como máximo una pieza.
 
-El orden del algoritmo es deliberado: primero selecciona el conjunto comercialmente elegible por estado, fechas, segmentación, idioma, marca activa y tiempo mínimo de repetición; solo después calcula la geometría. Entre los tamaños que caben, intenta primero el de mayor superficie y baja a otro menor si no puede colocar ninguno del tamaño anterior. Una composición nunca mezcla medidas: todas las piezas comparten exactamente ancho y alto. Se organizan en fila o columna y se descartan las combinaciones que exceden el área.
+El orden del algoritmo es deliberado: primero selecciona el conjunto comercialmente elegible por estado, fechas, segmentación, idioma, marca activa y tiempo mínimo de repetición; solo después calcula la geometría. Entre los tamaños que caben, intenta primero el de mayor superficie y baja a otro menor si no puede colocar ninguno del tamaño anterior. Una composición nunca mezcla medidas: todas las piezas comparten exactamente ancho y alto. Se organizan en fila o columna y se descartan las combinaciones que exceden el área. Las imágenes se renderizan con `object-fit: contain`; el motor no estira ni recorta una imagen para forzar otro tamaño. Si no hay una variante autorizada que quepa, devuelve `no-fill`.
 
 Las campañas comerciales elegibles se consideran antes que la publicidad propia; los anuncios propios son reserva solo cuando no queda inventario comercial que pueda ocupar el hueco. Dentro de un bloque no se repite una campaña ni una marca, y no se muestran juntas marcas que se hayan registrado como competidoras.
 
@@ -199,7 +206,7 @@ Entidades de datos previstas:
 - **Brands / marcas** (implementado): nombre, web, notas, estado activo y relaciones simétricas de competencia.
 - **Campaigns / campañas** (implementado): marca/pedido opcional, fechas, estado, prioridad, intervalo mínimo y topes de impresiones, clics y frecuencia por visitante.
 - **Advertisers / clientes comerciales** (implementado): nombre, datos de contacto, web, estado y archivado seguro. No sustituye una ficha fiscal completa.
-- **Creatives / anuncios**: campaña, título, texto, recurso visual, formato creativo, idioma, texto alternativo, destino y estado de aprobación.
+- **Creatives / anuncios**: campaña, título, texto, recurso visual, tipo de contenido, tamaño declarado, autorización de emisión (`fixed`/`adaptive`/`both`), idioma, texto alternativo, destino y estado de aprobación.
 - **Placements / espacios**: aplicación, código de ubicación, formatos y dimensiones admitidas.
 - **Targeting / segmentación**: reglas para tipos de página, entidades concretas, ubicaciones, idiomas, dispositivos y categorías; reglas de inclusión y exclusión.
 - **Orders/contracts / pedidos o contratos** (implementado): periodo, tarifa fija/CPM/CPC, presupuesto variable, topes, pacing y referencia contractual.

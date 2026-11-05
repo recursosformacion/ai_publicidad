@@ -41,7 +41,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="ai_publicidad",
     description="Servicio independiente de publicidad directa.",
-    version="0.4.1",
+    version="0.5.0",
     lifespan=lifespan,
 )
 

@@ -110,7 +110,7 @@ def _compose_context(request: ComposeAdRequest) -> ServeAdRequest:
         application=request.application,
         page=request.page,
         placement=request.placement,
-        format=FormatRequest(type="responsive"),
+        format=FormatRequest(type="any"),
         device=request.device,
         visitor_id=request.visitor_id,
     )
@@ -286,6 +286,11 @@ def _compose_options(
                 get_settings(), creative.package.sha256, creative.package.entrypoint
             ) is None:
                 continue
+        if fixed_format is not None:
+            if creative.delivery_mode not in {"fixed", "both"}:
+                continue
+        elif creative.delivery_mode not in {"adaptive", "both"}:
+            continue
 
         assigned_formats = [item for item in creative.ad_formats if item.is_active]
         if fixed_format is not None:
@@ -740,9 +745,11 @@ def serve_ad(request: ServeAdRequest, db: Session = Depends(get_db)) -> AdPayloa
                     continue
                 if campaign.brand_id is not None and campaign.brand_id not in active_brands:
                     continue
-                if creative.format not in {request.format.type, "responsive"}:
+                if request.format.type != "any" and creative.format != request.format.type:
                     continue
-                if creative.format == "html_package" and request.format.type != "html_package":
+                if creative.format == "html_package" and request.format.type not in {"any", "html_package"}:
+                    continue
+                if size_requested and creative.delivery_mode not in {"fixed", "both"}:
                     continue
                 if creative.language not in {request.page.language, "mul", "es"}:
                     continue
