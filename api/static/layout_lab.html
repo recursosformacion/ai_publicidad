@@ -58,11 +58,11 @@ var count=0;
 var cases={
  desktop:{title:"Cabecera escritorio",mode:"fixed_format",format_code:"leaderboard_728x90",placement:"header",device:"desktop",width:728,height:90,max_ads:1,gap:0,orientation:"auto"},
  mobile:{title:"Cabecera móvil",mode:"fixed_format",format_code:"mobile_banner_320x50",placement:"header",device:"mobile",width:320,height:50,max_ads:1,gap:0,orientation:"auto"},
- wide:{title:"Contenido ancho",mode:"auto_area",placement:"layout_lab",device:"desktop",width:640,height:320,max_ads:3,gap:12,orientation:"auto"},
- tall:{title:"Espacio alto",mode:"auto_area",placement:"layout_lab",device:"desktop",width:300,height:600,max_ads:3,gap:12,orientation:"auto"},
- inline:{title:"Contenido bajo",mode:"auto_area",placement:"layout_lab",device:"desktop",width:640,height:240,max_ads:3,gap:12,orientation:"auto"},
+ wide:{title:"Contenido ancho",mode:"auto_area",placement:"layout_lab",device:"desktop",width:640,height:320,max_ads:4,gap:12,orientation:"auto"},
+ tall:{title:"Espacio alto",mode:"auto_area",placement:"layout_lab",device:"desktop",width:300,height:600,max_ads:4,gap:12,orientation:"auto"},
+ inline:{title:"Contenido bajo",mode:"auto_area",placement:"layout_lab",device:"desktop",width:640,height:240,max_ads:4,gap:12,orientation:"auto"},
  vertical:{title:"Columna estrecha",mode:"fixed_format",format_code:"wide_skyscraper_160x600",placement:"sidebar",device:"desktop",width:160,height:600,max_ads:1,gap:0,orientation:"auto"},
- small:{title:"Hueco pequeño",mode:"auto_area",placement:"layout_lab",device:"mobile",width:140,height:80,max_ads:3,gap:8,orientation:"auto"}
+ small:{title:"Hueco pequeño",mode:"auto_area",placement:"layout_lab",device:"mobile",width:140,height:80,max_ads:4,gap:8,orientation:"auto"}
 };
 function el(id){return document.getElementById(id);}
 function chip(text){var node=document.createElement("span");node.className="chip";node.textContent=text;return node;}

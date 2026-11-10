@@ -156,7 +156,12 @@ Cada tarjeta incluye:
 
 Si no existe una composición válida, devuelve un bloque `data-layout-status="no-fill"`. El consumidor puede sustituirlo por su propio anuncio de reserva.
 
-**Regla de impresión del modo compose:** la emisión del fragmento cuenta como vista. Dentro de la misma transacción se crea, por cada tarjeta del HTML, una fila en `ad_deliveries` con `impression_confirmed=true` y un evento `impression` en `ad_events`. Si se devuelven tres anuncios, se registran tres entregas y tres impresiones; si se devuelve `no-fill`, no se registran. No hay endpoint posterior de impresión ni tabla de composiciones. El endpoint legado `/ads/serve` conserva su flujo separado.
+**Tarjetas estrechas y verticales.** En formatos de hasta 240 px de ancho la tarjeta usa tipografía
+compacta y oculta la línea de URL de destino. Si la creatividad tiene imagen y el formato es
+vertical (alto > 1,5 × ancho), la imagen ocupa hasta el 82 % del alto y se omite el texto para que
+el skyscraper 160×600 se vea como una pieza gráfica y no como texto comprimido.
+
+**Regla de impresión del modo compose:** la emisión del fragmento cuenta como vista. Dentro de la misma transacción se crea, por cada tarjeta del HTML, una fila en `ad_deliveries` con `impression_confirmed=true` y un evento `impression` en `ad_events`. Si se devuelven hasta cuatro anuncios, se registran hasta cuatro entregas y cuatro impresiones; si se devuelve `no-fill`, no se registran. No hay endpoint posterior de impresión ni tabla de composiciones. El endpoint legado `/ads/serve` conserva su flujo separado.
 
 La métrica representa **el bloque emitido**, no una medición de visibilidad real del navegador. Es la decisión deliberada para mantener una integración sencilla sin llamadas adicionales de impresión.
 

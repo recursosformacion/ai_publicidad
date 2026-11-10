@@ -48,7 +48,7 @@ class ComposeAdRequest(BaseModel):
     format_code: str | None = Field(default=None, min_length=2, max_length=50)
     creative_id: int | None = Field(default=None, gt=0)
     visitor_id: str | None = Field(default=None, min_length=1, max_length=160)
-    max_ads: int = Field(default=3, ge=1, le=3)
+    max_ads: int = Field(default=4, ge=1, le=4)
     gap: int = Field(default=12, ge=0, le=32)
     orientation: Literal["auto", "row", "column"] = "auto"
 

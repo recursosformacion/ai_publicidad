@@ -378,12 +378,15 @@ def _choose_layout(
     if not options:
         return None
 
-    # Strictly homogeneous composition: try the largest available standard size first.
+    # Strictly homogeneous composition: evaluate every size and keep the composition
+    # that best covers the reserved area; priority and count break ties.
     sizes = sorted(
         {(item.width, item.height) for item in options},
         key=lambda size: (size[0] * size[1], min(size), max(size)),
         reverse=True,
     )
+    best_layout: _Layout | None = None
+    best_layout_key: tuple[int, int, int, int] | None = None
     for width, height in sizes:
         size_options: list[_AdOption] = []
         seen_creatives: set[int] = set()
@@ -454,8 +457,13 @@ def _choose_layout(
                             preferred, best.items, best.score,
                             *_layout_dimensions(best.items, preferred, gap),
                         )
-                return best
-    return None
+                covered = best.width * best.height
+                layout_key = (covered, int(best.score), len(best.items), width * height)
+                if best_layout is None or layout_key > best_layout_key:
+                    best_layout = best
+                    best_layout_key = layout_key
+                break
+    return best_layout
 
 
 def _render_package_card(
@@ -590,15 +598,38 @@ def _render_layout_html(
                 )
                 continue
         alt = html.escape(creative.alt_text or "", quote=True)
+        width, height = option.width, option.height
+        tall_image = height > width * 1.5
         image_html = ""
         if creative.image_url:
             image_url = html.escape(creative.image_url, quote=True)
+            image_max_height = "82%" if tall_image else "44%"
             image_html = (
                 f'<img class="ap-ad-image" src="{image_url}" alt="{alt}" '
-                'style="display:block;max-width:100%;max-height:44%;object-fit:contain;margin:0 auto 6px">'
+                f'style="display:block;max-width:100%;max-height:{image_max_height};'
+                'object-fit:contain;margin:0 auto 6px">'
             )
 
-        width, height = option.width, option.height
+        compact = width <= 240
+        card_font = "12px/1.35" if compact else "14px/1.35"
+        title_font = "13px" if compact else "14px"
+        body_font = "11.5px" if compact else "14px"
+        card_padding = "8px" if compact else "10px"
+        url_html = ""
+        if width >= 280:
+            url_html = (
+                '<span style="display:block;font-size:11px;color:#2367a8">'
+                f'{html.escape(creative.destination_url, quote=True)}</span>'
+            )
+        text_html = ""
+        if not (creative.image_url and tall_image):
+            text_html = (
+                '<strong style="display:block;max-width:100%;overflow-wrap:break-word;'
+                f'font-size:{title_font}">{title}</strong>'
+                '<span style="display:block;max-width:100%;overflow-wrap:anywhere;'
+                f'font-size:{body_font}">{body}</span>'
+                f"{url_html}"
+            )
         rendered.append(
             f'<a class="ap-ad-card ap-ad-{kind}" href="{link}" target="_blank" '
             'rel="sponsored noopener noreferrer" '
@@ -608,23 +639,21 @@ def _render_layout_html(
             f'style="position:absolute;left:{x}px;top:{y}px;width:{width}px;height:{height}px;'
             'box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;'
             'justify-content:center;align-items:center;text-align:center;gap:4px;'
-            'padding:10px;border:1px solid #ced9e4;border-radius:8px;background:#fff;'
-            'color:#1f3347;text-decoration:none;font:14px/1.35 system-ui,sans-serif">'
+            f'padding:{card_padding};border:1px solid #ced9e4;border-radius:8px;background:#fff;'
+            f'color:#1f3347;text-decoration:none;font:{card_font} system-ui,sans-serif">'
             '<span style="position:absolute;left:7px;top:4px;font-size:9px;letter-spacing:.04em;'
             'text-transform:uppercase;color:#6b7b8c">Publicidad</span>'
-            f'{image_html}<strong style="display:block;max-width:100%;overflow-wrap:anywhere">{title}</strong>'
-            f'<span style="display:block;max-width:100%;overflow-wrap:anywhere">{body}</span>'
-            f'<span style="display:block;font-size:11px;color:#2367a8">{html.escape(creative.destination_url, quote=True)}</span>'
+            f"{image_html}{text_html}"
             "</a>"
         )
+    outer_surface = "background:transparent;border:0"
     return (
         '<div class="ap-layout" data-layout-status="ok" '
         f'data-layout="{html.escape(layout.orientation, quote=True)}" '
         f'data-ad-count="{count}" data-area-width="{area_width}" data-area-height="{area_height}" '
         f'data-layout-width="{layout.width}" data-layout-height="{layout.height}" '
         f'style="position:relative;width:{area_width}px;height:{area_height}px;max-width:100%;'
-        'overflow:hidden;box-sizing:border-box;background:#f4f7fa;'
-        'border:1px solid #d7e0e9">'
+        f'overflow:hidden;box-sizing:border-box;{outer_surface}">'
         + "".join(rendered)
         + "</div>"
     )

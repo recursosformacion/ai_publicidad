@@ -2,10 +2,8 @@
 
 from html.parser import HTMLParser
 
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from api.main import app
 from domain.models import AdDelivery, AdEvent
 
 
@@ -52,7 +50,6 @@ def _make_creative(client, campaign_id: int, title: str, fmt_id: int) -> int:
             "image_url": None,
             "alt_text": None,
             "format": "text",
-            "delivery_mode": "both",
             "language": "es",
             "destination_url": "https://openmusicrepository.com/",
             "status": "approved",
@@ -202,6 +199,166 @@ def test_fixed_format_returns_exactly_one_ad_and_counts_its_view(client, test_en
         assert db.query(AdEvent).count() == 1
 
 
+def test_single_ad_layout_has_no_outer_banner_box(client, test_engine):
+    _seed_layout_candidates(client)
+    response = client.post("/api/v1/ads/compose", json=_compose_payload(500, 300))
+    assert response.status_code == 200
+    parser = _AdHtmlParser()
+    parser.feed(response.text)
+    root = parser.root
+    assert root is not None
+    assert root["data-layout"] == "single"
+    assert root["data-ad-count"] == "1"
+    style = root["style"] or ""
+    assert "background:transparent" in style
+    assert "border:0" in style
+    assert "background:#f4f7fa" not in style
+    assert len(parser.cards) == 1
+
+    with Session(test_engine) as db:
+        assert db.query(AdDelivery).count() == 1
+        assert db.query(AdEvent).count() == 1
+
+
+def test_narrow_vertical_card_uses_compact_type_without_url_line(client, test_engine):
+    vertical = _make_format(client, "lab_vertical_160x600", 160, 600, "video")
+    campaign = client.post(
+        "/api/v1/admin/campaigns",
+        json={
+            "name": "Layout lab vertical campaign",
+            "status": "active",
+            "starts_at": None,
+            "ends_at": None,
+            "priority": 10,
+            "is_house_ad": True,
+        },
+    )
+    assert campaign.status_code == 201, campaign.text
+    _make_creative(client, campaign.json()["id"], "Vertical compacto", vertical)
+
+    response = client.post(
+        "/api/v1/ads/compose",
+        json={
+            "application": "osap",
+            "page": {"type": "ad_layout_lab", "language": "es"},
+            "placement": "layout_lab",
+            "device": "desktop",
+            "mode": "fixed_format",
+            "format_code": "lab_vertical_160x600",
+        },
+    )
+    assert response.status_code == 200
+    parser = _AdHtmlParser()
+    parser.feed(response.text)
+    assert len(parser.cards) == 1
+    assert parser.cards[0]["data-width"] == "160"
+    assert "font:12px/1.35" in response.text
+    assert "https://openmusicrepository.com/" not in response.text
+
+
+def test_tall_image_creative_fills_the_card_without_text_overlay(client, test_engine):
+    vertical = _make_format(client, "lab_image_skyscraper_160x600", 160, 600, "video")
+    campaign = client.post(
+        "/api/v1/admin/campaigns",
+        json={
+            "name": "Layout lab image campaign",
+            "status": "active",
+            "starts_at": None,
+            "ends_at": None,
+            "priority": 10,
+            "is_house_ad": True,
+        },
+    )
+    assert campaign.status_code == 201, campaign.text
+    creative = client.post(
+        "/api/v1/admin/creatives",
+        json={
+            "campaign_id": campaign.json()["id"],
+            "title": "Skyscraper de prueba",
+            "body": "Texto que no debe tapar la imagen.",
+            "image_url": "https://example.org/skyscraper.png",
+            "alt_text": "Skyscraper",
+            "format": "image",
+            "language": "es",
+            "destination_url": "https://openmusicrepository.com/",
+            "status": "approved",
+            "ad_format_ids": [vertical],
+        },
+    )
+    assert creative.status_code == 201, creative.text
+    for rule_type, rule_value in (("application", "osap"), ("placement", "layout_lab")):
+        rule = client.post(
+            "/api/v1/admin/targeting-rules",
+            json={
+                "creative_id": creative.json()["id"],
+                "rule_type": rule_type,
+                "rule_value": rule_value,
+                "effect": "include",
+            },
+        )
+        assert rule.status_code == 201, rule.text
+
+    response = client.post(
+        "/api/v1/ads/compose",
+        json={
+            "application": "osap",
+            "page": {"type": "ad_layout_lab", "language": "es"},
+            "placement": "layout_lab",
+            "device": "desktop",
+            "mode": "fixed_format",
+            "format_code": "lab_image_skyscraper_160x600",
+        },
+    )
+    assert response.status_code == 200
+    assert 'max-height:82%' in response.text
+    assert "Skyscraper de prueba" not in response.text
+    assert "Texto que no debe tapar la imagen." not in response.text
+
+
+def test_area_optimizer_chooses_four_squares_over_two_rectangles(client, test_engine):
+    square = _make_format(client, "grid_square_200x200", 200, 200, "square")
+    rectangle = _make_format(client, "grid_rectangle_300x250", 300, 250, "rectangle")
+
+    def add_house(title: str, fmt_id: int) -> int:
+        campaign = client.post(
+            "/api/v1/admin/campaigns",
+            json={
+                "name": f"Grid campaign {title}",
+                "status": "active",
+                "starts_at": None,
+                "ends_at": None,
+                "priority": 10,
+                "is_house_ad": True,
+            },
+        )
+        assert campaign.status_code == 201, campaign.text
+        return _make_creative(client, campaign.json()["id"], title, fmt_id)
+
+    for index in range(4):
+        add_house(f"Grid square {index}", square)
+    for index in range(2):
+        add_house(f"Grid rectangle {index}", rectangle)
+
+    response = client.post(
+        "/api/v1/ads/compose", json=_compose_payload(900, 260, max_ads=4)
+    )
+    assert response.status_code == 200
+    parser = _AdHtmlParser()
+    parser.feed(response.text)
+    root = parser.root
+    assert root is not None
+    assert root["data-layout"] == "row"
+    assert root["data-ad-count"] == "4"
+    assert len(parser.cards) == 4
+    assert all(card["data-width"] == "200" for card in parser.cards)
+    assert all(card["data-height"] == "200" for card in parser.cards)
+    assert "background:transparent" in (root["style"] or "")
+
+    with Session(test_engine) as db:
+        assert db.query(AdDelivery).count() == 4
+        assert db.query(AdEvent).count() == 4
+
+
 def test_no_fill_returns_an_empty_fragment_without_creating_views(client, test_engine):
     _seed_layout_candidates(client)
     response = client.post("/api/v1/ads/compose", json=_compose_payload(140, 80))
@@ -223,7 +380,10 @@ def test_layout_lab_is_local_only_and_page_is_packaged(client, monkeypatch):
 
     from types import SimpleNamespace
 
-    monkeypatch.setattr("api.routes.layout_lab.get_settings", lambda: SimpleNamespace(env="production"))
+    monkeypatch.setattr(
+        "api.routes.layout_lab.get_settings",
+        lambda: SimpleNamespace(env="production"),
+    )
     hidden = client.get("/layout-lab")
     assert hidden.status_code == 404
 
@@ -418,4 +578,5 @@ def test_equal_priority_alternatives_rotate_to_the_least_recently_shown(client, 
     with Session(test_engine) as db:
         assert db.query(AdDelivery).count() == 2
         assert db.query(AdEvent).count() == 2
+
 

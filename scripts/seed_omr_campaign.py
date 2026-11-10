@@ -199,7 +199,9 @@ def seed_omr_campaign(db: Session) -> bool:
                 format="text",
                 delivery_mode="adaptive",
                 language="es",
-                destination_url="https://openmusicrepository.com/",
+                destination_url=seed.get(
+                    "destination_url", "https://openmusicrepository.com/"
+                ),
                 status="approved",
             )
             db.add(creative)

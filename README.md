@@ -349,6 +349,12 @@ Cada creatividad tiene texto promocional en español, destino `https://openmusic
 
 La carga se prepara y revisa primero con `python scripts/seed_omr_campaign.py`; solo escribe al ejecutar `python scripts/seed_omr_campaign.py --apply` (o `--apply --allow-sqlite` para SQLite local). No se ha aplicado automáticamente a `OSAP_PUBLICIDAD`.
 
+### Anuncios del pie de OSAP
+
+`scripts/seed_osap_footer_ads.py` prepara cuatro creatividades cuadradas 200×200 para la ranura `content_bottom` de la aplicación OSAP: **Vídeos**, **Blog**, **Apóyanos** y **Repertorio abierto**. Cada una vive en su propia campaña house porque el compositor nunca combina dos creatividades de la misma campaña; así caben las cuatro en una fila de 900×300. Los destinos son los subdominios públicos correspondientes.
+
+Uso idempotente: `python scripts/seed_osap_footer_ads.py` (simulación) y `python scripts/seed_osap_footer_ads.py --apply` para escribir en `OSAP_PUBLICIDAD`.
+
 ## 10. Prueba HTTP real de entrega y fallback
 
 Los tests automáticos usan una base SQLite en memoria y ejercitan las rutas HTTP de FastAPI; **no utilizan ni vacían `OSAP_PUBLICIDAD`**. Para comprobar también el servicio arrancado y la base configurada en tu máquina, se incluye un smoke test explícito.

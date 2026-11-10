@@ -52,6 +52,8 @@ jobs:
         run: python scripts/seed_house_ads.py --help
       - name: Check OpenMusicRepository campaign seed command starts correctly
         run: python scripts/seed_omr_campaign.py --help
+      - name: Check OSAP footer seed command starts correctly
+        run: python scripts/seed_osap_footer_ads.py --help
       - name: Check live delivery smoke test command starts correctly
         run: python scripts/smoke_test_delivery.py --help
       - name: Ensure production-style seed refuses accidental SQLite writes
