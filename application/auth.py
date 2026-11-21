@@ -16,7 +16,7 @@ from fastapi import HTTPException, Request, status
 from infrastructure.config import get_settings
 
 SESSION_COOKIE = "ai_publicidad_session"
-SESSION_MAX_AGE = 7 * 24 * 3600
+SESSION_MAX_AGE = 5 * 60
 
 
 def _secret() -> str:
@@ -76,6 +76,11 @@ def require_admin_session(request: Request) -> None:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="OSAP admin session required",
         )
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        origin = request.headers.get("origin", "").rstrip("/")
+        expected = f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
+        if not origin or origin != expected:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="origen no permitido")
 
 
 def verify_osap_admin(token: str) -> dict[str, Any] | None:
