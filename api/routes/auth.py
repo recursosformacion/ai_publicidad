@@ -3,7 +3,7 @@
 from urllib.parse import parse_qs
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 
 from application.auth import (
     SESSION_COOKIE,
@@ -26,7 +26,7 @@ def login() -> RedirectResponse:
 
 
 @router.post("/auth/session", include_in_schema=False)
-async def auth_session(request: Request) -> RedirectResponse | JSONResponse:
+async def auth_session(request: Request) -> Response:
     settings = get_settings()
     allowed = {item.strip().rstrip("/") for item in settings.admin_handoff_origins.split(",") if item.strip()}
     origin = request.headers.get("origin", "").rstrip("/")
