@@ -78,7 +78,8 @@ def require_admin_session(request: Request) -> None:
         )
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
         origin = request.headers.get("origin", "").rstrip("/")
-        expected = f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
+        public = urlsplit(settings.public_base_url)
+        expected = f"{public.scheme}://{public.netloc}".rstrip("/")
         if not origin or origin != expected:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="origen no permitido")
 
