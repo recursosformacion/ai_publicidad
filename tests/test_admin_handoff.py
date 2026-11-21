@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from api.main import app
 from application.auth import SESSION_MAX_AGE
 
 
