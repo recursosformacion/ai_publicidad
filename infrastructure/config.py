@@ -103,6 +103,7 @@ class Settings(BaseSettings):
     service_token: str = ""
     auth_base_url: str = "http://127.0.0.1:8200"
     osap_public_url: str = "http://osap-app"
+    admin_handoff_origins: str = "https://app.openmusicrepository.com"
     session_secret: str = ""
     visitor_hash_secret: str = ""
     enable_layout_lab: bool = False
