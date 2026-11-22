@@ -274,7 +274,7 @@ El token identifica una entrega válida. El servidor registra el clic y obtiene 
 
 - `GET /health`: estado básico del servicio, sin revelar credenciales.
 - `GET /api/v1/metadata/page-types`: opcionalmente, catálogo versionado de tipos de página.
-- Administración: rutas separadas. La autorización de usuarios se implementará en una fase posterior; mientras tanto, no expongas públicamente la pantalla ni los endpoints de administración.
+- Administración: rutas separadas y protegidas por sesión de administrador de OSAP; la sesión se valida contra Auth y el handoff comprueba Origin.
 
 ### API de administración implementada
 
@@ -310,7 +310,7 @@ No se almacena una tabla de composiciones. Cada anuncio emitido se registra como
 
 Las migraciones `0002_ad_format_catalog` y `0003_brands_and_cooldown` añaden el catálogo de formatos, las relaciones de marcas y las reglas de intervalo temporal. Las dimensiones se guardan como enteros de píxeles; no se codifican dentro del texto del anuncio. No se guardan combinaciones publicitarias ni una tabla de composición: cada entrega se registra individualmente.
 
-**Pendiente:** autorización administrativa, factura/pago fiscal, informes contables, antifraude avanzado, retención configurable y pruebas de carga/concurrencia en MySQL. La clave HMAC de visitantes debe configurarse como secreto privado en producción.
+**Pendiente:** factura/pago fiscal, informes contables, antifraude avanzado, retención configurable y pruebas de carga/concurrencia en MySQL. La clave HMAC de visitantes debe configurarse como secreto privado en producción.
 
 ## 9. Base de datos y configuración
 
@@ -456,7 +456,7 @@ En PowerShell, deja `AI_PUBLICIDAD_DATABASE_URL` vacía cuando quieras usar el `
 - Se pueden dirigir campañas a tipos de página y a entidades concretas.
 - Una impresión repetida con el mismo identificador no se cuenta dos veces.
 - El clic se registra y redirige únicamente al destino autorizado del anuncio.
-- La autorización de usuarios para el mantenimiento de campañas y creatividades queda pendiente y debe implementarse antes de exponer el panel públicamente.
+- El mantenimiento de campañas y creatividades exige una sesión administrativa de OSAP; debe conservarse la prueba de roles y expiración en cada liberación.
 - Las pruebas se ejecutan con SQLite y la aplicación funciona con MySQL en producción.
 - No hay credenciales reales en Git y un fallo de `ai_publicidad` no debe impedir que OSAP muestre su contenido principal.
 
