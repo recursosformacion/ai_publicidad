@@ -1,8 +1,8 @@
 # ai_publicidad
 
-Servicio independiente de publicidad directa para OSAP/OpenMusicRepository. El núcleo gestiona campañas, creatividades, segmentación, entrega de anuncios, impresiones, clics y redirecciones. Ya incluye anunciantes, pedidos/contratos, topes por campaña y pedido, presupuestos CPM/CPC, pacing y frecuencia por visitante. Siguen pendientes la integración real desde el frontend de OSAP, la autorización administrativa y un modelo específico de ubicaciones configurables.
+Servicio independiente de publicidad directa para OSAP/OpenMusicRepository. El núcleo gestiona campañas, creatividades, segmentación, entrega de anuncios, impresiones, clics y redirecciones. Ya incluye anunciantes, pedidos/contratos, topes por campaña y pedido, presupuestos CPM/CPC, pacing y frecuencia por visitante. La integración de entrega con OSAP y la autorización administrativa están implementadas; siguen pendientes placements configurables, conciliación/facturación y pruebas de carga/concurrencia.
 
-El proyecto es un servicio independiente **Python 3.11+ + FastAPI**, alineado con `AI_osap-auth`, `AI_osap-storage` y `AI_osap-support`. Ya existe un primer núcleo funcional; el contrato de integración con `osap-app` sigue pendiente de validar con el código real del frontend.
+El proyecto es un servicio independiente **Python 3.11+ + FastAPI**, alineado con `AI_osap-auth`, `AI_osap-storage` y `AI_osap-support`. El servicio se integra con `osap-app` a través de la fachada servidor-a-servidor de `osap-api`; el frontend no recibe el token del servicio publicitario.
 
 ## Integración con OSAP
 
@@ -12,7 +12,7 @@ La guía de implementación se mantiene en el repositorio OSAP, tras revisar el 
 
 El motor de composición ya está implementado en [`docs/ad-layout-optimization.md`](docs/ad-layout-optimization.md): filtra primero las campañas comercialmente elegibles, aplica marcas y restricciones temporales y después busca el tamaño más grande que encaje. Una composición solo usa anuncios del mismo tamaño y devuelve el HTML listo para insertar. El laboratorio visual permite comprobarlo sin escribir en la base de datos real.
 
-Importante: la SPA actual todavía usa `SponsorSlot` y `sponsors.json`; la integración requiere una fachada servidor-a-servidor en `osap-api`. No envíes `AI_PUBLICIDAD_SERVICE_TOKEN` al navegador ni publiques el panel `/admin` del servicio publicitario antes de añadir autorización.
+Importante: `osap-app` utiliza `AdSlot` y `apiClient.composeAd()` a través de `osap-api`, con `SponsorSlot` como fallback. `AI_PUBLICIDAD_SERVICE_TOKEN` permanece en el backend. El panel `/admin` valida una sesión administrativa de OSAP y el handoff exige el Origin autorizado.
 
 ## 1. Objetivos y principios
 
@@ -62,7 +62,7 @@ Catálogo inicial propuesto (ampliable y versionado):
 
 Cada solicitud podrá incluir, cuando proceda, `entity_type` y `entity_id` (por ejemplo, obra concreta o persona concreta). No se debe usar la URL como único identificador de página.
 
-**Estado de validación:** la documentación accesible de `AI_GAMEPC2` describe el contrato del frontend como pendiente y no permite confirmar todas las rutas públicas actuales de `osap-app`. Por tanto, esta lista sigue siendo una propuesta de integración, no una afirmación de que cada página exista. Antes de conectar anuncios se deberá contrastar con el código real del frontend y mantener los códigos estables en ambos proyectos.
+**Estado de validación:** el frontend ya consume el contrato de composición a través de `osap-api`. La lista de tipologías sigue siendo un catálogo de segmentación; no debe interpretarse como garantía de que todas las páginas propuestas estén activas.
 
 ## 4. Espacios publicitarios y formatos
 
@@ -278,7 +278,7 @@ El token identifica una entrega válida. El servidor registra el clic y obtiene 
 
 ### API de administración implementada
 
-Las rutas CRUD están disponibles bajo `/api/v1/admin`. La pantalla web está en `/admin` y utiliza estas rutas en el mismo origen. La autenticación y autorización de administradores se aplaza expresamente a una fase posterior; hasta implementarla, ejecuta el panel solo en entorno local o en una red interna de confianza y no lo publiques directamente en Internet.
+Las rutas CRUD están disponibles bajo `/api/v1/admin`. La pantalla web está en `/admin` y utiliza estas rutas en el mismo origen. Las rutas administrativas exigen una sesión de administrador de OSAP validada contra el servicio de identidad; el handoff POST comprueba Origin y utiliza cookie HttpOnly.
 
 - **Campañas:** `GET/POST /campaigns`, `GET/PUT/DELETE /campaigns/{id}`.
 - **Creatividades:** `GET/POST /creatives`, `GET/PUT/DELETE /creatives/{id}`.
@@ -334,7 +334,7 @@ Las migraciones `0002_ad_format_catalog` y `0003_brands_and_cooldown` añaden el
   ```
   Antes de la última orden, comprueba que el destino mostrado es exactamente `OSAP_PUBLICIDAD`. La migración bloquea conexiones MySQL a cualquier otra base.
 - En desarrollo, `.env.example` mantiene SQLite como opción segura predeterminada. La API no crea tablas automáticamente sobre MySQL; el esquema se gestiona mediante Alembic.
-- Producción requiere `AI_PUBLICIDAD_SERVICE_TOKEN` para las operaciones de entrega, `AI_PUBLICIDAD_PUBLIC_BASE_URL` con HTTPS y una conexión que termine en `OSAP_PUBLICIDAD`. Antes de exponer los endpoints administrativos en producción hay que implementar autenticación y autorización.
+- Producción requiere `AI_PUBLICIDAD_SERVICE_TOKEN` para las operaciones de entrega, `AI_PUBLICIDAD_PUBLIC_BASE_URL` con HTTPS y una conexión que termine en `OSAP_PUBLICIDAD`. En producción deben estar configurados el token de servicio, el secreto de hash de visitantes y el origen HTTPS de contenido HTML aislado.
 
 ### Campaña inicial de OpenMusicRepository
 
@@ -428,7 +428,7 @@ En PowerShell, deja `AI_PUBLICIDAD_DATABASE_URL` vacía cuando quieras usar el `
 - Confirmar CI y ejecutar smoke tests contra una instancia local aislada antes de conectar el frontend.
 - Revisar el destino de `scripts/seed_house_ads.py` y `scripts/seed_omr_campaign.py`; no se han aplicado a tu base de producción desde este cambio.
 - Validar la taxonomía de páginas y ubicaciones con el código real de `osap-app`.
-- Implementar autenticación/autorización administrativa antes de publicar el panel fuera de una red de confianza.
+- Ejecutar pruebas de seguridad del handoff administrativo, expiración de sesión y autorización por rol.
 - Diseñar placements configurables, informes/retención, conciliación fiscal y pruebas de carga/concurrencia real con MySQL.
 - Configurar `AI_PUBLICIDAD_VISITOR_HASH_SECRET` como secreto privado de producción.
 
@@ -444,9 +444,9 @@ En PowerShell, deja `AI_PUBLICIDAD_DATABASE_URL` vacía cuando quieras usar el `
 - Pendiente: autenticación, informes financieros completos, auditoría de configuración y factura/pago.
 
 ### Fase 4 — Integración con OSAP
-- Implementar el cliente API en `osap-app`.
-- Confirmar los eventos desde el cliente sin bloquear la representación de la página.
-- Verificar tamaños, accesibilidad, idiomas y comportamiento móvil.
+- Integración `AdSlot` → `osap-api` → `ai_publicidad` implementada.
+- Confirmar impresiones en emisión del bloque y clics mediante redirección controlada.
+- Continuar validando tamaños, accesibilidad, idiomas y comportamiento móvil.
 - Probar caída del servicio y fallback de anuncios propios.
 
 ## 13. Criterios de aceptación iniciales
@@ -462,7 +462,7 @@ En PowerShell, deja `AI_PUBLICIDAD_DATABASE_URL` vacía cuando quieras usar el `
 
 ---
 
-**Estado:** diseño inicial. La lista de tipos de página, los contratos comerciales y los endpoints se deben contrastar con la implementación real de `osap-app` antes de cerrar el contrato de integración.
+**Estado:** servicio funcional integrado con OSAP. La liberación coordinada debe verificar la configuración de servicio, las migraciones y el fallback; el README no sustituye la prueba de integración ejecutada.
 
 ## 14. Liberación a producción
 
