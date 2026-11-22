@@ -108,13 +108,30 @@ def verify_osap_admin(token: str) -> dict[str, Any] | None:
 
 
 def safe_next(value: str, fallback: str) -> str:
-    """Allow only local paths or the configured public origin."""
-    settings = get_settings()
-    if value.startswith("/") and not value.startswith("//"):
-        return value
+    """Allow only unambiguous local paths or the configured public origin."""
+    if (
+        not value
+        or "\\" in value
+        or any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
+    ):
+        return fallback
+
     parsed = urlsplit(value)
+    if value.startswith("/"):
+        if value.startswith("//") or parsed.scheme or parsed.netloc:
+            return fallback
+        return value
+
+    settings = get_settings()
     public = urlsplit(settings.public_base_url)
-    if parsed.scheme == public.scheme and parsed.netloc == public.netloc:
+    if (
+        parsed.scheme in {"http", "https"}
+        and parsed.netloc
+        and not parsed.username
+        and not parsed.password
+        and parsed.scheme == public.scheme
+        and parsed.netloc == public.netloc
+    ):
         return value
     return fallback
 
