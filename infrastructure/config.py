@@ -81,7 +81,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    env: Literal["development", "test", "production"] = "development"
+    env: Literal["development", "test", "production"] = "production"
     # Explicit URL wins. Otherwise, read this service's OSAP_CONFIG/[db]; local development falls back to SQLite.
     database_url: str | None = None
     osap_config_path: str | None = Field(
