@@ -66,6 +66,8 @@ def test_safe_next_rejects_ambiguous_backslash_and_control_characters(monkeypatc
     monkeypatch.setattr("application.auth.get_settings", _settings)
 
     assert safe_next(r"/\\attacker.example/", "/admin") == "/admin"
+    assert safe_next(r"/\attacker.example/", "/admin") == "/admin"
+    assert safe_next("/admin\attacker", "/admin") == "/admin"
     assert safe_next("/admin\\\\attacker", "/admin") == "/admin"
     assert safe_next("/admin\r\nLocation: https://attacker.example", "/admin") == "/admin"
     assert safe_next("//attacker.example/", "/admin") == "/admin"
