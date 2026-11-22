@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from application.auth import SESSION_MAX_AGE
+from application.auth import SESSION_MAX_AGE, safe_next
 
 
 def _settings():
@@ -49,3 +49,23 @@ def test_admin_handoff_rejects_untrusted_origin(client, monkeypatch):
         follow_redirects=False,
     )
     assert response.status_code == 403
+
+
+
+def test_safe_next_accepts_only_local_paths_or_exact_public_origin(monkeypatch):
+    monkeypatch.setattr("application.auth.get_settings", _settings)
+
+    assert safe_next("/admin?tab=brands", "/admin") == "/admin?tab=brands"
+    assert safe_next("https://ads.openmusicrepository.com/admin", "/admin") == (
+        "https://ads.openmusicrepository.com/admin"
+    )
+    assert safe_next("https://attacker.example/admin", "/admin") == "/admin"
+
+
+def test_safe_next_rejects_ambiguous_backslash_and_control_characters(monkeypatch):
+    monkeypatch.setattr("application.auth.get_settings", _settings)
+
+    assert safe_next(r"/\\attacker.example/", "/admin") == "/admin"
+    assert safe_next("/admin\\\\attacker", "/admin") == "/admin"
+    assert safe_next("/admin\r\nLocation: https://attacker.example", "/admin") == "/admin"
+    assert safe_next("//attacker.example/", "/admin") == "/admin"
