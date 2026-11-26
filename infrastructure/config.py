@@ -5,15 +5,14 @@ configuration, but this service uses its independent OSAP_PUBLICIDAD schema.
 Secrets are never committed.
 """
 
+import tomllib
 from functools import lru_cache
 from pathlib import Path
-import tomllib
 from typing import Literal
 
 from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
-
 
 DATABASE_NAME = "OSAP_PUBLICIDAD"
 
@@ -82,7 +81,8 @@ class Settings(BaseSettings):
     )
 
     env: Literal["development", "test", "production"] = "production"
-    # Explicit URL wins. Otherwise, read this service's OSAP_CONFIG/[db]; local development falls back to SQLite.
+    # Explicit URL wins. Otherwise, read this service's OSAP_CONFIG/[db];
+    # local development falls back to SQLite.
     database_url: str | None = None
     osap_config_path: str | None = Field(
         default=None,
@@ -104,6 +104,8 @@ class Settings(BaseSettings):
     auth_base_url: str = "http://127.0.0.1:8200"
     osap_public_url: str = "http://osap-app"
     admin_handoff_origins: str = "https://app.openmusicrepository.com"
+    # La sesión del panel es propia (no un service token M2M): 8 h por defecto.
+    session_max_age_seconds: int = 28800
     session_secret: str = ""
     visitor_hash_secret: str = ""
     enable_layout_lab: bool = False
@@ -132,6 +134,10 @@ class Settings(BaseSettings):
         if self.env == "production":
             if not self.service_token.strip():
                 raise ValueError("AI_PUBLICIDAD_SERVICE_TOKEN es obligatorio en producción")
+            if not self.session_secret.strip():
+                raise ValueError("AI_PUBLICIDAD_SESSION_SECRET es obligatorio en producción")
+            if not self.admin_handoff_origins.strip():
+                raise ValueError("AI_PUBLICIDAD_ADMIN_HANDOFF_ORIGINS es obligatorio en producción")
             if not self.visitor_hash_secret.strip():
                 raise ValueError("AI_PUBLICIDAD_VISITOR_HASH_SECRET es obligatorio en producción")
             if self.database_url.startswith("sqlite"):

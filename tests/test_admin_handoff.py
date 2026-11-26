@@ -51,7 +51,6 @@ def test_admin_handoff_rejects_untrusted_origin(client, monkeypatch):
     assert response.status_code == 403
 
 
-
 def test_safe_next_accepts_only_local_paths_or_exact_public_origin(monkeypatch):
     monkeypatch.setattr("application.auth.get_settings", _settings)
 
@@ -71,3 +70,14 @@ def test_safe_next_rejects_ambiguous_backslash_and_control_characters(monkeypatc
     assert safe_next("/admin\\\\attacker", "/admin") == "/admin"
     assert safe_next("/admin\r\nLocation: https://attacker.example", "/admin") == "/admin"
     assert safe_next("//attacker.example/", "/admin") == "/admin"
+
+
+def test_admin_handoff_rejects_missing_token(client, monkeypatch):
+    monkeypatch.setattr("api.routes.auth.get_settings", _settings)
+    response = client.post(
+        "/auth/session",
+        headers={"Origin": "https://app.openmusicrepository.com"},
+        data={"next": "/admin"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 401

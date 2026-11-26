@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from sqlalchemy.engine import make_url
 
 from infrastructure.config import DATABASE_NAME, database_url_from_osap_toml
@@ -139,3 +140,24 @@ def test_settings_prefers_this_services_own_osap_toml_over_any_sibling(
     assert url.database == "OSAP_PUBLICIDAD"
     assert url.host == "publicidad-db.example.test"
     assert url.username == "publicidad_user"
+
+
+def test_production_requires_session_and_handoff_configuration(monkeypatch) -> None:
+    from infrastructure.config import Settings
+
+    monkeypatch.setenv("AI_PUBLICIDAD_ENV", "production")
+    monkeypatch.setenv(
+        "AI_PUBLICIDAD_DATABASE_URL",
+        "mysql+pymysql://publicidad:not-a-real-secret@db.example.test/OSAP_PUBLICIDAD",
+    )
+    monkeypatch.setenv("AI_PUBLICIDAD_SERVICE_TOKEN", "not-a-real-token")
+    monkeypatch.setenv("AI_PUBLICIDAD_VISITOR_HASH_SECRET", "not-a-real-secret")
+    monkeypatch.setenv(
+        "AI_PUBLICIDAD_PUBLIC_BASE_URL",
+        "https://app.openmusicrepository.com/publicidad",
+    )
+    monkeypatch.delenv("AI_PUBLICIDAD_SESSION_SECRET", raising=False)
+    monkeypatch.delenv("AI_PUBLICIDAD_ADMIN_HANDOFF_ORIGINS", raising=False)
+
+    with pytest.raises(ValueError, match="SESSION_SECRET"):
+        Settings(_env_file=None)

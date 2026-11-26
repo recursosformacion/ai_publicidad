@@ -16,7 +16,13 @@ from fastapi import HTTPException, Request, status
 from infrastructure.config import get_settings
 
 SESSION_COOKIE = "ai_publicidad_session"
-SESSION_MAX_AGE = 5 * 60
+SESSION_MAX_AGE = 28800
+
+
+def _max_age() -> int:
+    settings = get_settings()
+    configured = getattr(settings, "session_max_age_seconds", SESSION_MAX_AGE)
+    return max(60, int(configured))
 
 
 def _secret() -> str:
@@ -32,7 +38,7 @@ def _session_payload(user: dict[str, Any]) -> str:
             "name": user.get("name"),
             "email": user.get("email"),
         },
-        "exp": int(time.time()) + SESSION_MAX_AGE,
+        "exp": int(time.time()) + _max_age(),
     }
     raw = base64.urlsafe_b64encode(
         json.dumps(data, separators=(",", ":"), ensure_ascii=False).encode()
@@ -141,7 +147,7 @@ def set_session_cookie(response: Any, user: dict[str, Any]) -> None:
     response.set_cookie(
         SESSION_COOKIE,
         _session_payload(user),
-        max_age=SESSION_MAX_AGE,
+        max_age=_max_age(),
         httponly=True,
         secure=settings.public_base_url.startswith("https://"),
         samesite="lax",

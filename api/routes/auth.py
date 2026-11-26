@@ -52,10 +52,10 @@ async def auth_session(request: Request) -> Response:
     token = (fields.get("token") or [""])[0].strip()
     next_path = (fields.get("next") or ["/admin"])[0].strip() or "/admin"
     if not token:
-        return JSONResponse(status_code=400, content={"detail": "falta el token de usuario"})
+        return JSONResponse(status_code=401, content={"detail": "falta el token de usuario"})
     user = verify_osap_admin(token)
     if user is None:
-        return RedirectResponse("/auth/login?error=session", status_code=303)
+        return JSONResponse(status_code=401, content={"detail": "sesión OSAP inválida"})
     response = RedirectResponse(
         safe_next(next_path, f"{settings.public_base_url.rstrip('/')}/admin"),
         status_code=303,
